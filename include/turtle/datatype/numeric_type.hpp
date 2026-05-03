@@ -1,4 +1,5 @@
 #pragma once
+
 #include "type.hpp"
 #include "value.hpp"
 #include <cmath>
@@ -35,4 +36,4 @@ protected:
   }
 };
 
-} // namespace Turtle::Type
+} // namespace turtle::datatype

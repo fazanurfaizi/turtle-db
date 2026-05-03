@@ -10,7 +10,7 @@
 #include "turtle/catalog/database.hpp"
 #include "turtle/catalog/metadata.hpp"
 #include "turtle/common/util/binary_serializer.hpp"
-#include "turtle/storage/disk_manager.hpp"
+#include "turtle/storage/disk/disk_manager.hpp"
 
 namespace turtle::catalog {
 
@@ -18,7 +18,7 @@ constexpr uint32_t MAGIC_NUMBER = 0xDEADBEEF;
 constexpr uint32_t DATABASE_VERSION = 1;
 
 Catalog::Catalog(buffer::BufferPoolManager *bpm,
-                 storage::DiskManager *disk_manager,
+                 storage::disk::DiskManager *disk_manager,
                  const std::string &catalog_file, const std::string &db_dir)
     : bpm_(bpm), disk_manager_(disk_manager),
       catalog_file_path_(std::move(catalog_file)), db_dir_(std::move(db_dir)) {
@@ -244,4 +244,4 @@ void Catalog::load_database_metadata(Database &db,
   db.get_metadata().touch();
 }
 
-} // namespace Turtle::Catalog
+} // namespace turtle::catalog

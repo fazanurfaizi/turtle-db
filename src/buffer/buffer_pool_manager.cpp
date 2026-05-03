@@ -3,13 +3,14 @@
 #include "turtle/buffer/buffer_pool_manager.hpp"
 #include "turtle/buffer/lru_replacer.hpp"
 #include "turtle/common/config.hpp"
-#include "turtle/storage/page.hpp"
+#include "turtle/storage/page/page.hpp"
 
 namespace turtle::buffer {
 
-BufferPoolManager::BufferPoolManager(size_t pool_size, storage::DiskManager *disk_manager)
+BufferPoolManager::BufferPoolManager(size_t pool_size,
+                                     storage::disk::DiskManager *disk_manager)
     : pool_size_(pool_size), replacer_(pool_size), disk_manager_(disk_manager) {
-  this->pages_ = new storage::Page[this->pool_size_];
+  this->pages_ = new storage::page::Page[this->pool_size_];
   this->frame_data_ = new char[this->pool_size_ * PAGE_SIZE];
 
   for (FrameId i = 0; i < static_cast<FrameId>(this->pool_size_); ++i) {
@@ -24,7 +25,8 @@ BufferPoolManager::~BufferPoolManager() {
   delete[] this->pages_;
 }
 
-storage::Page *BufferPoolManager::fetch_page(FileId file_id, PageId page_id) {
+storage::page::Page *BufferPoolManager::fetch_page(FileId file_id,
+                                                   PageId page_id) {
   std::lock_guard<std::mutex> guard(this->latch_);
 
   PageKey key{file_id, page_id};
@@ -32,7 +34,7 @@ storage::Page *BufferPoolManager::fetch_page(FileId file_id, PageId page_id) {
   // Page is in buffer pool
   if (this->page_table_.count(key)) {
     FrameId frame_id = this->page_table_[key];
-    storage::Page& page = this->pages_[frame_id];
+    storage::page::Page &page = this->pages_[frame_id];
 
     page.pin_count_++;
     this->replacer_.pin(frame_id);
@@ -51,12 +53,13 @@ storage::Page *BufferPoolManager::fetch_page(FileId file_id, PageId page_id) {
     }
   }
 
-  storage::Page &frame = this->pages_[frame_id];
+  storage::page::Page &frame = this->pages_[frame_id];
 
   // Evict old page if needed
   if (frame.page_id_ != INVALID_PAGE_ID) {
     if (frame.is_dirty()) {
-      this->disk_manager_->write_page(frame.file_id(), frame.page_id(), frame.data());
+      this->disk_manager_->write_page(frame.file_id(), frame.page_id(),
+                                      frame.data());
     }
     this->page_table_.erase({frame.file_id(), frame.page_id()});
   }
@@ -75,7 +78,8 @@ storage::Page *BufferPoolManager::fetch_page(FileId file_id, PageId page_id) {
   return &frame;
 }
 
-bool BufferPoolManager::unpin_page(FileId file_id, PageId page_id, bool is_dirty) {
+bool BufferPoolManager::unpin_page(FileId file_id, PageId page_id,
+                                   bool is_dirty) {
   std::lock_guard<std::mutex> guard(this->latch_);
 
   PageKey key{file_id, page_id};
@@ -84,7 +88,7 @@ bool BufferPoolManager::unpin_page(FileId file_id, PageId page_id, bool is_dirty
   }
 
   FrameId frame_id = this->page_table_[key];
-  storage::Page &page = this->pages_[frame_id];
+  storage::page::Page &page = this->pages_[frame_id];
 
   if (page.pin_count_ <= 0) {
     return false;
@@ -112,7 +116,7 @@ bool BufferPoolManager::flush_page(FileId file_id, PageId page_id) {
   }
 
   FrameId frame_id = this->page_table_[key];
-  storage::Page &page = this->pages_[frame_id];
+  storage::page::Page &page = this->pages_[frame_id];
 
   this->disk_manager_->write_page(page.file_id(), page.page_id(), page.data());
   page.is_dirty_ = false;
@@ -122,18 +126,20 @@ bool BufferPoolManager::flush_page(FileId file_id, PageId page_id) {
 
 void BufferPoolManager::flush_all_pages() {
   std::lock_guard<std::mutex> guard(this->latch_);
-  
+
   for (FrameId i = 0; i < static_cast<FrameId>(this->pool_size_); ++i) {
-    storage::Page& page = this->pages_[i];
+    storage::page::Page &page = this->pages_[i];
 
     if (page.page_id() != INVALID_PAGE_ID && page.is_dirty()) {
-      this->disk_manager_->write_page(page.file_id(), page.page_id(), page.data());
+      this->disk_manager_->write_page(page.file_id(), page.page_id(),
+                                      page.data());
       page.is_dirty_ = false;
     }
   }
 }
 
-storage::Page *BufferPoolManager::new_page(FileId file_id, PageId *page_id) {
+storage::page::Page *BufferPoolManager::new_page(FileId file_id,
+                                                 PageId *page_id) {
   std::lock_guard<std::mutex> guard(this->latch_);
 
   FrameId frame_id;
@@ -146,14 +152,15 @@ storage::Page *BufferPoolManager::new_page(FileId file_id, PageId *page_id) {
     }
   }
 
-  storage::Page &frame = this->pages_[frame_id];
+  storage::page::Page &frame = this->pages_[frame_id];
 
   if (frame.page_id() != INVALID_PAGE_ID) {
     if (frame.is_dirty()) {
-      this->disk_manager_->write_page(frame.file_id(), frame.page_id(), frame.data());
+      this->disk_manager_->write_page(frame.file_id(), frame.page_id(),
+                                      frame.data());
     }
     this->page_table_.erase({frame.file_id(), frame.page_id()});
-  } 
+  }
 
   // Allocate new Page ID
   *page_id = this->next_page_id_++;
@@ -182,7 +189,7 @@ bool BufferPoolManager::delete_page(FileId file_id, PageId page_id) {
   }
 
   FrameId frame_id = this->page_table_[key];
-  storage::Page &page = this->pages_[frame_id];
+  storage::page::Page &page = this->pages_[frame_id];
 
   if (page.pin_count() > 0) {
     // Cannot delete a pinned page
@@ -202,4 +209,4 @@ bool BufferPoolManager::delete_page(FileId file_id, PageId page_id) {
   return true;
 }
 
-} // namespace Turtle::Buffer
+} // namespace turtle::buffer

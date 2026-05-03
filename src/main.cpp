@@ -195,3 +195,65 @@
 //
 //   return 1;
 // }
+#include <iostream>
+#include <memory>
+#include <vector>
+
+#include "turtle/buffer/buffer_pool_manager.hpp"
+#include "turtle/catalog/column.hpp"
+#include "turtle/catalog/column_schema.hpp"
+#include "turtle/common/config.hpp"
+#include "turtle/common/record_id.hpp"
+#include "turtle/datatype/data_types.hpp"
+#include "turtle/execution/seq_scan_executor.hpp"
+#include "turtle/storage/disk/disk_manager.hpp"
+#include "turtle/storage/table/table_heap.hpp"
+#include "turtle/storage/table/tuple.hpp"
+
+int main(int argc, char *argv[]) {
+  auto disk_manager = std::make_unique<turtle::storage::disk::DiskManager>();
+  auto bpm = std::make_unique<turtle::buffer::BufferPoolManager>(
+      10, disk_manager.get());
+
+  turtle::FileId table_file_id = disk_manager->create_file("test_db/table.db");
+
+  auto table_heap = std::make_unique<turtle::storage::table::TableHeap>(
+      bpm.get(), table_file_id);
+
+  // Create a mock Table Schema
+  std::vector<turtle::catalog::Column> cols;
+  cols.emplace_back("id", turtle::datatype::DataType::INTEGER);
+  cols.emplace_back("age", turtle::datatype::DataType::INTEGER);
+  turtle::catalog::ColumnSchema mock_table_schema(cols);
+
+  // Create the raw values
+  std::vector<turtle::datatype::Value> values_1;
+  values_1.emplace_back(turtle::datatype::DataType::INTEGER, 1);
+  values_1.emplace_back(turtle::datatype::DataType::INTEGER, 25);
+  turtle::storage::table::Tuple tuple1(&mock_table_schema, values_1);
+
+  std::vector<turtle::datatype::Value> values_2;
+  values_2.emplace_back(turtle::datatype::DataType::INTEGER, 2);
+  values_2.emplace_back(turtle::datatype::DataType::INTEGER, 50);
+  turtle::storage::table::Tuple tuple2(&mock_table_schema, values_2);
+
+  turtle::RecordId rid;
+
+  table_heap->insert_tuple(tuple1, &rid);
+  table_heap->insert_tuple(tuple2, &rid);
+
+  // Run a Sequential Scan
+  turtle::execution::SeqScanExecutor scanner(table_heap.get());
+  scanner.init();
+
+  turtle::storage::table::Tuple result_tuple;
+  turtle::RecordId result_rid;
+
+  std::cout << "--- Starting Scan ---" << std::endl;
+  while (scanner.next(&result_tuple, &result_rid)) {
+    std::cout << "Found Tuple at: " << result_rid.to_string() << std::endl;
+  }
+  std::cout << "--- Scan Complete ---" << std::endl;
+
+  return 0;
+}

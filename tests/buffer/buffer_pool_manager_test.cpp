@@ -3,29 +3,29 @@
 #include <filesystem>
 #include <iostream>
 #include <memory>
-#include <ranges>
 #include <string>
 #include <vector>
 
 #include "turtle/buffer/buffer_pool_manager.hpp"
 #include "turtle/common/config.hpp"
-#include "turtle/storage/disk_manager.hpp"
-#include "turtle/storage/page.hpp"
+#include "turtle/storage/disk/disk_manager.hpp"
+#include "turtle/storage/page/page.hpp"
 
 using turtle::FileId;
-using turtle::PageId;
 using turtle::FrameId;
+using turtle::PageId;
 
 void print_test_result(const std::string &test_name, bool success) {
-  std::cout << "[TEST] " << test_name << ": " 
-    << (success ? "PASSED" : "FAILED") << std::endl;
+  std::cout << "[TEST] " << test_name << ": " << (success ? "PASSED" : "FAILED")
+            << std::endl;
 }
 
 /**
-* @test
-* Base new_page -> write -> unpin -> fetch -> verify
-*/
-void test_new_page_and_fetch(turtle::buffer::BufferPoolManager *bpm, FileId file_id) {
+ * @test
+ * Base new_page -> write -> unpin -> fetch -> verify
+ */
+void test_new_page_and_fetch(turtle::buffer::BufferPoolManager *bpm,
+                             FileId file_id) {
   std::cout << "\n-- Running test_new_page_and_fetch --" << std::endl;
   bool success = true;
 
@@ -38,18 +38,20 @@ void test_new_page_and_fetch(turtle::buffer::BufferPoolManager *bpm, FileId file
 
   print_test_result("new_page returns valud page", success);
 
-  if (!success) return;
+  if (!success)
+    return;
 
   const std::string test_str = "Hello from page 0!";
   std::strcpy(page_0->data(), test_str.c_str());
 
-  // Unpin dirty 
+  // Unpin dirty
   bpm->unpin_page(file_id, page_id_0, true);
 
   // Fetch again
   auto *fetched = bpm->fetch_page(file_id, page_id_0);
 
-  if (fetched == nullptr || std::strcmp(fetched->data(), test_str.c_str()) != 0) {
+  if (fetched == nullptr ||
+      std::strcmp(fetched->data(), test_str.c_str()) != 0) {
     success = false;
   }
 
@@ -61,15 +63,16 @@ void test_new_page_and_fetch(turtle::buffer::BufferPoolManager *bpm, FileId file
 }
 
 /**
-* @test
-* File buffer pool, force eviction, verify data survives
-*/
-void test_buffer_pool_full(turtle::buffer::BufferPoolManager *bpm, FileId file_id, size_t pool_size) {
+ * @test
+ * File buffer pool, force eviction, verify data survives
+ */
+void test_buffer_pool_full(turtle::buffer::BufferPoolManager *bpm,
+                           FileId file_id, size_t pool_size) {
   std::cout << "\n-- Running test_buffer_pool_full --" << std::endl;
   bool success = true;
 
   std::vector<PageId> page_ids;
-  std::vector<turtle::storage::Page *> pages;
+  std::vector<turtle::storage::page::Page *> pages;
 
   // Fill buffer
   for (size_t i = 0; i < pool_size; ++i) {
@@ -78,7 +81,8 @@ void test_buffer_pool_full(turtle::buffer::BufferPoolManager *bpm, FileId file_i
 
     if (!page) {
       success = false;
-      std::cout << "[ERROR] new_page returned nullptr at i = " << i << std::endl;
+      std::cout << "[ERROR] new_page returned nullptr at i = " << i
+                << std::endl;
       break;
     }
 
@@ -97,7 +101,8 @@ void test_buffer_pool_full(turtle::buffer::BufferPoolManager *bpm, FileId file_i
   // Fetch a page again
   auto *fetched = bpm->fetch_page(file_id, 1);
 
-  if (fetched == nullptr || std::strcmp(fetched->data(), "Data for page 1") != 0) {
+  if (fetched == nullptr ||
+      std::strcmp(fetched->data(), "Data for page 1") != 0) {
     success = false;
   }
 
@@ -109,18 +114,15 @@ void test_buffer_pool_full(turtle::buffer::BufferPoolManager *bpm, FileId file_i
 }
 
 /**
-* @test
-* All pages pinned → cannot allocate new page
-*/
-void test_pinning(
-  turtle::buffer::BufferPoolManager *bpm,
-  FileId file_id,
-  size_t pool_size
-) {
+ * @test
+ * All pages pinned → cannot allocate new page
+ */
+void test_pinning(turtle::buffer::BufferPoolManager *bpm, FileId file_id,
+                  size_t pool_size) {
   std::cout << "\n--- Running test_pinning ---" << std::endl;
   bool success = true;
 
-  std::vector<turtle::storage::Page *> pinned_pages;
+  std::vector<turtle::storage::page::Page *> pinned_pages;
 
   // Pin all pages
   for (size_t i = 0; i < pool_size; ++i) {
@@ -146,11 +148,7 @@ void test_pinning(
 
   // Cleanup
   for (size_t i = 0; i < pinned_pages.size(); ++i) {
-    bpm->unpin_page(
-      file_id,
-      pinned_pages[i]->page_id(),
-      false
-    );
+    bpm->unpin_page(file_id, pinned_pages[i]->page_id(), false);
   }
 }
 
@@ -165,7 +163,7 @@ int main() {
   std::filesystem::remove_all(test_dir);
   std::filesystem::create_directories(test_dir);
 
-  auto disk_manager = std::make_unique<turtle::storage::DiskManager>();
+  auto disk_manager = std::make_unique<turtle::storage::disk::DiskManager>();
 
   // Create file and get file_id
   disk_manager->create_file(test_file);

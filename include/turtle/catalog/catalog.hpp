@@ -7,13 +7,14 @@
 #include "turtle/buffer/buffer_pool_manager.hpp"
 #include "turtle/catalog/database.hpp"
 #include "turtle/catalog/metadata.hpp"
-#include "turtle/storage/disk_manager.hpp"
+#include "turtle/storage/disk/disk_manager.hpp"
 
 namespace turtle::catalog {
 
 class Catalog {
 public:
-  Catalog(buffer::BufferPoolManager *bpm, storage::DiskManager *disk_manager,
+  Catalog(buffer::BufferPoolManager *bpm,
+          storage::disk::DiskManager *disk_manager,
           const std::string &catalog_file, const std::string &db_dir);
   ~Catalog();
   Catalog(const Catalog &) = delete;
@@ -32,7 +33,7 @@ public:
 
 private:
   buffer::BufferPoolManager *bpm_;
-  storage::DiskManager *disk_manager_;
+  storage::disk::DiskManager *disk_manager_;
   std::string catalog_file_path_;
   std::string db_dir_;
 
@@ -45,4 +46,4 @@ private:
   void load_database_metadata(Database &db, const std::string &meta_file);
 };
 
-} // namespace Turtle::Catalog
+} // namespace turtle::catalog

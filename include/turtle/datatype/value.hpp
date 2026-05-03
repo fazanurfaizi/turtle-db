@@ -1,9 +1,9 @@
 #pragma once
 
 #include "data_types.hpp"
-#include <fmt/core.h>
 #include "numeric_type.hpp"
 #include <cstdint>
+#include <fmt/core.h>
 #include <type_traits>
 
 #include <cstring>
@@ -62,7 +62,7 @@ public:
 
   // VARCHAR
   Value(DataType type, const char *data, uint32_t len, bool manage_data);
-  Value(DataType type, const std::string &data);
+  Value(DataType type, std::string &data);
   Value(DataType type, const std::vector<double> &data);
 
   Value() : Value(DataType::INVALID) {}
@@ -215,7 +215,7 @@ private:
   } size_;
 };
 
-} // namespace Turtle::Type
+} // namespace turtle::datatype
 
 template <typename T>
 struct fmt::formatter<
@@ -238,4 +238,3 @@ struct fmt::formatter<
     return fmt::formatter<std::string>::format(value->to_string(), ctx);
   }
 };
-

@@ -9,7 +9,7 @@
 
 #include "turtle/common/config.hpp"
 
-namespace turtle::storage {
+namespace turtle::storage::disk {
 
 class DiskManager {
 public:
@@ -30,8 +30,7 @@ public:
    * @param page_id The ID of the page to read.
    * @param page_data A buffer to read the page data into.
    */
-  void read_page(FileId file_id, PageId page_id,
-                 char *page_data);
+  void read_page(FileId file_id, PageId page_id, char *page_data);
 
   /**
    * @brief Writes a page to a specific file on disk.
@@ -39,8 +38,7 @@ public:
    * @param page_id The ID of the page to write.
    * @param page_data The data to write to the page.
    */
-  void write_page(FileId file_id, PageId page_id,
-                  const char *page_data);
+  void write_page(FileId file_id, PageId page_id, const char *page_data);
 
 private:
   std::unordered_map<FileId, std::unique_ptr<std::fstream>> files_;
@@ -49,7 +47,6 @@ private:
   std::mutex latch_;
 
   std::atomic<FileId> next_file_id_{0};
-
 };
 
-} // namespace Turtle::Storage
+} // namespace turtle::storage::disk

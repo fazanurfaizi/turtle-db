@@ -5,9 +5,9 @@
 
 #include "turtle/common/config.hpp"
 #include "turtle/common/record_id.hpp"
-#include "turtle/storage/page.hpp"
+#include "turtle/storage/page/page.hpp"
 
-namespace turtle::storage {
+namespace turtle::storage::page {
 
 class Tuple;
 
@@ -19,13 +19,17 @@ public:
 
   void init(PageId page_id);
 
-  template<typename T>
-  bool insert_tuple(const T &tuple, RecordId *record_id);
+  template <typename T> bool insert_tuple(const T &tuple, RecordId *record_id);
 
-  template<typename T>
-  void tuple(const RecordId &record_id, T *tuple);
+  template <typename T> void tuple(const RecordId &record_id, T *tuple);
 
   void delete_tuple(const RecordId &record_id);
+
+  inline PageId get_next_page_id() const { return header()->next_page_id_; };
+
+  inline void set_next_page_id(PageId &next_page_id) {
+    header()->next_page_id_ = next_page_id;
+  };
 
   uint32_t free_space_remaining() const;
   PageId page_id() const;
@@ -34,8 +38,9 @@ public:
 private:
   struct Header {
     PageId page_id_;
-    uint32_t slot_count_; // Total slots (active + empty)
-    uint32_t tuple_count_; // Active tuples
+    PageId next_page_id_{INVALID_PAGE_ID};
+    uint32_t slot_count_;         // Total slots (active + empty)
+    uint32_t tuple_count_;        // Active tuples
     uint32_t free_space_pointer_; // Offset to the start of free space
   };
 
@@ -53,7 +58,7 @@ private:
 };
 
 // Template implementations
-template<typename T>
+template <typename T>
 bool SlottedPage::insert_tuple(const T &tuple, RecordId *record_id) {
   uint32_t size = tuple.storage_size();
   if (this->free_space_remaining() < size + sizeof(Slot)) {
@@ -89,7 +94,7 @@ bool SlottedPage::insert_tuple(const T &tuple, RecordId *record_id) {
   return true;
 }
 
-template<typename T>
+template <typename T>
 void SlottedPage::tuple(const RecordId &record_id, T *tuple) {
   this->validate_record_id(record_id);
   Slot *slots = this->slots();
@@ -103,4 +108,4 @@ void SlottedPage::tuple(const RecordId &record_id, T *tuple) {
   tuple->deserialize_from(this->data() + slot.offset_, slot.length_);
 }
 
-}
+} // namespace turtle::storage::page

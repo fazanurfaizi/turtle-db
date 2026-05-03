@@ -7,9 +7,9 @@
 #include <stdexcept>
 
 #include "turtle/common/config.hpp"
-#include "turtle/storage/disk_manager.hpp"
+#include "turtle/storage/disk/disk_manager.hpp"
 
-namespace turtle::storage {
+namespace turtle::storage::disk {
 
 DiskManager::~DiskManager() {
   std::lock_guard<std::mutex> guard(this->latch_);
@@ -38,8 +38,7 @@ FileId DiskManager::create_file(const std::string &file_path) {
   this->path_to_file_id_[file_path] = file_id;
 
   auto fs = std::make_unique<std::fstream>(
-    file_path, std::ios::in | std::ios::out | std::ios::binary
-  );
+      file_path, std::ios::in | std::ios::out | std::ios::binary);
 
   if (!fs->is_open()) {
     throw std::runtime_error("Failed to open file: " + file_path);
@@ -59,7 +58,8 @@ FileId DiskManager::open_file(const std::string &file_path) {
   FileId new_id = static_cast<FileId>(this->path_to_file_id_.size() + 1);
   this->path_to_file_id_[file_path] = new_id;
 
-  auto fs = std::make_unique<std::fstream>(file_path, std::ios::in | std::ios::out | std::ios::binary);
+  auto fs = std::make_unique<std::fstream>(
+      file_path, std::ios::in | std::ios::out | std::ios::binary);
 
   if (!fs->is_open()) {
     throw std::runtime_error("Failed to open file: " + file_path);
@@ -77,7 +77,7 @@ void DiskManager::read_page(FileId file_id, PageId page_id, char *page_data) {
     throw std::runtime_error("Invalid file id in read_page");
   }
 
-  std::fstream& file = *it->second;
+  std::fstream &file = *it->second;
   std::streamoff offset = static_cast<std::streamoff>(page_id) * PAGE_SIZE;
 
   file.seekg(offset, std::ios::beg);
@@ -104,9 +104,11 @@ void DiskManager::read_page(FileId file_id, PageId page_id, char *page_data) {
   //
   //   this->files_[file_path].open(file_path,
   //                                       std::ios::in | std::ios::out |
-  //                                           std::ios::binary | std::ios::app);
+  //                                           std::ios::binary |
+  //                                           std::ios::app);
   //   if (!this->files_[file_path].is_open()) {
-  //     throw std::runtime_error("Could not open file for reading: " + file_path);
+  //     throw std::runtime_error("Could not open file for reading: " +
+  //     file_path);
   //   }
   // }
   //
@@ -128,15 +130,16 @@ void DiskManager::read_page(FileId file_id, PageId page_id, char *page_data) {
   // }
 }
 
-void DiskManager::write_page(FileId file_id, PageId page_id, const char *page_data) {
+void DiskManager::write_page(FileId file_id, PageId page_id,
+                             const char *page_data) {
   std::lock_guard<std::mutex> guard(this->latch_);
-  
+
   auto it = this->files_.find(file_id);
   if (it == this->files_.end()) {
     throw std::runtime_error("Invalid file id in write_page");
   }
 
-  std::fstream& file = *it->second;
+  std::fstream &file = *it->second;
   std::streamoff offset = static_cast<std::streamoff>(page_id) * PAGE_SIZE;
 
   file.seekg(offset, std::ios::beg);
@@ -154,16 +157,18 @@ void DiskManager::write_page(FileId file_id, PageId page_id, const char *page_da
   //   }
   //
   //   // Try to open for read/write; if it fails, create the file first
-  //   std::fstream fs(file_path, std::ios::in | std::ios::out | std::ios::binary);
-  //   if (!fs.is_open()) {
+  //   std::fstream fs(file_path, std::ios::in | std::ios::out |
+  //   std::ios::binary); if (!fs.is_open()) {
   //     std::ofstream create(file_path,
-  //                          std::ios::out | std::ios::binary | std::ios::trunc);
+  //                          std::ios::out | std::ios::binary |
+  //                          std::ios::trunc);
   //     create.close();
   //     fs.open(file_path, std::ios::in | std::ios::out | std::ios::binary);
   //   }
   //
   //   if (!fs.is_open()) {
-  //     throw std::runtime_error("Could not open file for writing: " + file_path);
+  //     throw std::runtime_error("Could not open file for writing: " +
+  //     file_path);
   //   }
   //   this->files_[file_path] = std::move(fs);
   // }
@@ -184,4 +189,4 @@ void DiskManager::write_page(FileId file_id, PageId page_id, const char *page_da
   // file.flush(); // Ensure data is written to OS buffer
 }
 
-} // namespace Turtle::Storage
+} // namespace turtle::storage::disk

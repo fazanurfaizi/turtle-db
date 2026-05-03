@@ -5,7 +5,7 @@
 #include "turtle/buffer/buffer_pool_manager.hpp"
 #include "turtle/common/config.hpp"
 
-namespace turtle::storage {
+namespace turtle::storage::page {
 
 class Page {
 public:
@@ -17,9 +17,7 @@ public:
   int pin_count() const { return this->pin_count_; }
   bool is_dirty() const { return this->is_dirty_; }
 
-  void reset_memory() {
-    std::memset(this->data_, 0, PAGE_SIZE);
-  }
+  void reset_memory() { std::memset(this->data_, 0, PAGE_SIZE); }
 
 private:
   friend class turtle::buffer::BufferPoolManager;
@@ -31,5 +29,4 @@ private:
   bool is_dirty_{false};
 };
 
-} // namespace Turtle::Storage
-
+} // namespace turtle::storage::page

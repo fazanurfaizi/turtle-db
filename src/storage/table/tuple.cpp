@@ -1,18 +1,19 @@
-#include "turtle/record/tuple.hpp"
-#include "turtle/catalog/schema.hpp"
+#include "turtle/storage/table/tuple.hpp"
 #include "turtle/datatype/value.hpp"
 #include <cassert>
 #include <cstdint>
 #include <cstring>
-#include <iostream>
 
-namespace turtle::record {
+namespace turtle::storage::table {
 
-Tuple::Tuple(std::vector<datatype::Value> values, const catalog::Schema *schema) {
-  assert(values.size() == schema->total_tables());
+Tuple::Tuple(const catalog::ColumnSchema *schema,
+             std::vector<datatype::Value> values) {
+  assert(values.size() == schema->get_columns().size());
 
   uint32_t column_count = values.size();
   uint32_t null_bitmap_size = (column_count + 7) / 8;
+
+  this->storage_size_ = null_bitmap_size;
 
   for (const auto &val : values) {
     this->storage_size_ += val.storage_size();
@@ -65,7 +66,7 @@ Tuple &Tuple::operator=(const Tuple &other) {
     this->allocated_ = true;
     this->storage_size_ = other.storage_size_;
     this->record_id_ = other.record_id_;
-    this->data_ = other.data_;
+    this->data_ = new char[this->storage_size_];
     std::memcpy(this->data_, other.data_, this->storage_size_);
   } else {
     this->allocated_ = false;
@@ -76,7 +77,7 @@ Tuple &Tuple::operator=(const Tuple &other) {
 }
 
 Tuple::~Tuple() {
-  if (this->allocated_){
+  if (this->allocated_) {
     delete[] this->data_;
   }
 }
@@ -96,9 +97,11 @@ void Tuple::deserialize_from(const char *storage, uint32_t size) {
   this->allocated_ = true;
 }
 
-datatype::Value Tuple::value(const catalog::Schema *schema, uint32_t column_idx) const {
+datatype::Value Tuple::value(const catalog::ColumnSchema *schema,
+                             uint32_t column_idx) const {
   // We need column definition from Schema to determine types
-  const auto &columns = schema->
+  // const auto &columns = schema->
+  return datatype::Value();
 }
 
-}
+} // namespace turtle::storage::table
