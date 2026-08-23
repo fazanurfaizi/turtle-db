@@ -109,12 +109,11 @@ datatype::Value Tuple::value(const catalog::ColumnSchema *schema,
   auto null_bitmap_size = (column_count + 7) / 8;
 
   // Calculate byte offset of this column
-  // auto offset = null_bitmap_size;
-  // for (uint32_t i = 0; i < column_idx; ++i) {
-  //   auto *type = datatype::Type::get_instance(columns[i].get_type());
-  //   offset += type->get_storage_size(const Value &value);
-  // }
-  auto offset = null_bitmap_size + (column_idx * 4);
+  auto offset = null_bitmap_size;
+  for (uint32_t i = 0; i < column_idx; ++i) {
+    offset += static_cast<uint32_t>(
+        datatype::Type::get_type_size(columns[i].get_type()));
+  }
 
   // Check if column is NULL by inspecting bitmap
   char *bitmap_ptr = this->data_;
