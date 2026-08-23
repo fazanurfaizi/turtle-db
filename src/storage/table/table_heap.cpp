@@ -63,21 +63,21 @@ TableHeap::TableHeap(buffer::BufferPoolManager *bpm, FileId file_id,
 
 bool TableHeap::insert_tuple(const Tuple &tuple, RecordId *rid) {
   // Fetch the last page of the table where we usually have free space.
-  page::Page *page = this->bpm_->fetch_page(0, this->last_page_id_);
+  page::Page *page = this->bpm_->fetch_page(this->file_id_, this->last_page_id_);
   page::SlottedPage slotted_page(page);
 
   // Try to insert the tuple into this page.
   if (slotted_page.insert_tuple(tuple, rid)) {
-    this->bpm_->unpin_page(0, this->last_page_id_, true);
+    this->bpm_->unpin_page(this->file_id_, this->last_page_id_, true);
     return true;
   }
 
   // If it failed, the page is full. Create a new page.
   PageId new_page_id;
-  page::Page *new_page = this->bpm_->new_page(0, &new_page_id);
+  page::Page *new_page = this->bpm_->new_page(this->file_id_, &new_page_id);
   if (new_page == nullptr) {
     // BPM is completely full and nothing can be evicted.
-    this->bpm_->unpin_page(0, this->last_page_id_, false);
+    this->bpm_->unpin_page(this->file_id_, this->last_page_id_, false);
     return false;
   }
 
@@ -88,7 +88,7 @@ bool TableHeap::insert_tuple(const Tuple &tuple, RecordId *rid) {
   // Link the old last page to this new page
   slotted_page.set_next_page_id(new_page_id);
 
-  this->bpm_->unpin_page(0, this->last_page_id_, true);
+  this->bpm_->unpin_page(this->file_id_, this->last_page_id_, true);
 
   // Insert the tuple into the new page
   bool success = new_slotted_page.insert_tuple(tuple, rid);
@@ -97,14 +97,14 @@ bool TableHeap::insert_tuple(const Tuple &tuple, RecordId *rid) {
   this->last_page_id_ = new_page_id;
 
   // Unpin the new page and mark dirty
-  this->bpm_->unpin_page(0, new_page_id, true);
+  this->bpm_->unpin_page(this->file_id_, new_page_id, true);
 
   return success;
 }
 
 bool TableHeap::get_tuple(const RecordId &rid, Tuple *tuple) {
   // Fetch specific page containing the tuple
-  page::Page *page = this->bpm_->fetch_page(0, rid.page_id);
+  page::Page *page = this->bpm_->fetch_page(this->file_id_, rid.page_id);
   if (page == nullptr)
     return false;
 
@@ -113,7 +113,7 @@ bool TableHeap::get_tuple(const RecordId &rid, Tuple *tuple) {
   // Read the tuple data into the provided pointer
   slotted_page.tuple(rid, tuple);
 
-  this->bpm_->unpin_page(0, rid.page_id, false);
+  this->bpm_->unpin_page(this->file_id_, rid.page_id, false);
   return true;
 }
 

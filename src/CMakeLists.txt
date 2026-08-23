@@ -2,6 +2,7 @@
 add_subdirectory(buffer)
 add_subdirectory(catalog)
 add_subdirectory(common)
+add_subdirectory(concurrency)
 add_subdirectory(datatype)
 add_subdirectory(execution)
 # add_subdirectory(index) add_subdirectory(log) add_subdirectory(parser)
@@ -16,6 +17,7 @@ target_link_libraries(
   PRIVATE buffer
           catalog
           common
+          concurrency
           datatype
           execution
           storage

@@ -12,5 +12,7 @@ target_include_directories(${CATALOG_LIBRARY_NAME} PUBLIC
   ${CMAKE_SOURCE_DIR}/include
 )
 
-target_link_libraries(${CATALOG_LIBRARY_NAME} PRIVATE project_warnings)
+target_link_libraries(${CATALOG_LIBRARY_NAME}
+                      PUBLIC fmt::fmt datatype storage buffer
+                      PRIVATE project_warnings)
 
