@@ -1,4 +1,6 @@
 #include "turtle/storage/table/tuple.hpp"
+#include "turtle/common/macros.hpp"
+#include "turtle/datatype/type.hpp"
 #include "turtle/datatype/value.hpp"
 #include <cassert>
 #include <cstdint>
@@ -99,9 +101,32 @@ void Tuple::deserialize_from(const char *storage, uint32_t size) {
 
 datatype::Value Tuple::value(const catalog::ColumnSchema *schema,
                              uint32_t column_idx) const {
-  // We need column definition from Schema to determine types
-  // const auto &columns = schema->
-  return datatype::Value();
+  // Get schema metadata
+  const auto &columns = schema->get_columns();
+  TURTLE_ASSERT(column_idx < columns.size(), "Column is out of range");
+
+  auto column_count = columns.size();
+  auto null_bitmap_size = (column_count + 7) / 8;
+
+  // Calculate byte offset of this column
+  // auto offset = null_bitmap_size;
+  // for (uint32_t i = 0; i < column_idx; ++i) {
+  //   auto *type = datatype::Type::get_instance(columns[i].get_type());
+  //   offset += type->get_storage_size(const Value &value);
+  // }
+  auto offset = null_bitmap_size + (column_idx * 4);
+
+  // Check if column is NULL by inspecting bitmap
+  char *bitmap_ptr = this->data_;
+  bool is_null = (bitmap_ptr[column_idx / 8] & (1 << (column_idx % 8))) != 0;
+
+  if (is_null) {
+    return datatype::Value();
+  }
+
+  // Deserialize the value from buffer at offset
+  auto *type = datatype::Type::get_instance(columns[column_idx].get_type());
+  return type->deserialize(this->data_ + offset);
 }
 
 } // namespace turtle::storage::table

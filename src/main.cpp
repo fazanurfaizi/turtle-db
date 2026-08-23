@@ -3,12 +3,12 @@
 #include <memory>
 #include <vector>
 
+#include "fmt/base.h"
 #include "turtle/buffer/buffer_pool_manager.hpp"
 #include "turtle/catalog/catalog.hpp"
 #include "turtle/catalog/column.hpp"
 #include "turtle/catalog/column_schema.hpp"
 #include "turtle/catalog/table_info.hpp"
-#include "turtle/common/config.hpp"
 #include "turtle/common/record_id.hpp"
 #include "turtle/datatype/data_types.hpp"
 #include "turtle/datatype/value.hpp"
@@ -47,13 +47,13 @@ int main() {
   };
 
   RecordId rid;
-  auto t1 = make_tuple(1, 25);
-  auto t2 = make_tuple(2, 50);
-  table_info->table_->insert_tuple(t1, &rid);
-  table_info->table_->insert_tuple(t2, &rid);
+  for (int id = 1; id <= 100; ++id) {
+    table_info->table_->insert_tuple(make_tuple(id, id * 7), &rid);
+  }
 
   // Build the plan + executor context, then run the plan-driven scan.
-  execution::plans::SeqScanPlanNode plan(schema_ref, table_info->oid_, "people");
+  execution::plans::SeqScanPlanNode plan(schema_ref, table_info->oid_,
+                                         "people");
   execution::ExecutorContext exec_ctx(catalog.get(), bpm.get(), false);
   execution::executors::SeqScanExecutor scan(&exec_ctx, &plan);
 
@@ -66,7 +66,18 @@ int main() {
   size_t count = 0;
   while (scan.next(&batch, &rids, 256)) {
     for (size_t i = 0; i < batch.size(); ++i) {
-      std::cout << "row " << count++ << " at " << rids[i].to_string() << '\n';
+      const auto &t = batch[i];
+      const auto &schema = scan.get_output_schema();
+      const auto &columns = schema.get_columns();
+
+      fmt::print("row {}: [", count++);
+      for (uint32_t col = 0; col < columns.size(); ++col) {
+        auto val = t.value(&schema, col);
+        fmt::print("{}", val);
+        if (col < columns.size() - 1)
+          fmt::print(", ");
+      }
+      std::cout << "]" << " at " << rids[i].to_string() << '\n';
     }
   }
   std::cout << "--- Scan complete (" << count << " rows) ---\n";

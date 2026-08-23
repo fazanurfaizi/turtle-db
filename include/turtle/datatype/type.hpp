@@ -79,7 +79,7 @@ public:
   // Access the raw varlen value data stored from the tuple storage
   virtual auto get_data(const Value &value) const -> const char *;
 
-  // et the storage size of the value.
+  // get the storage size of the value.
   virtual auto get_storage_size(const Value &value) const -> uint32_t;
 
 private:
@@ -89,4 +89,4 @@ private:
   static Type *k_types[10];
 };
 
-} // namespace Turtle::Type
+} // namespace turtle::datatype
