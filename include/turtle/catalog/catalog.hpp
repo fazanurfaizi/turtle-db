@@ -7,6 +7,8 @@
 #include "turtle/buffer/buffer_pool_manager.hpp"
 #include "turtle/catalog/database.hpp"
 #include "turtle/catalog/metadata.hpp"
+#include "turtle/catalog/table_info.hpp"
+#include "turtle/common/config.hpp"
 #include "turtle/storage/disk/disk_manager.hpp"
 
 namespace turtle::catalog {
@@ -31,6 +33,16 @@ public:
   Database *get_database(const std::string &database_name);
   const Database *get_database(const std::string &database_name) const;
 
+  /** Table runtime registry
+   * Creates a table's physical storage (its own backing file + heap) and
+   * registers it, returning a non-owning handle
+   */
+  TableInfo *create_table(const std::string &table_name, ColumnSchema schema);
+
+  // Resolve a registered table by OID or by name; nullptr if not found.
+  TableInfo *get_table(TableOid oid);
+  TableInfo *get_table(const std::string &table_name);
+
 private:
   buffer::BufferPoolManager *bpm_;
   storage::disk::DiskManager *disk_manager_;
@@ -39,6 +51,11 @@ private:
 
   std::unordered_map<std::string, std::unique_ptr<Metadata>> metadatas_;
   std::unordered_map<std::string, std::unique_ptr<Database>> databases_;
+
+  // Runtime table registry
+  std::unordered_map<TableOid, std::unique_ptr<TableInfo>> tables_;
+  std::unordered_map<std::string, TableOid> table_oids_;
+  TableOid next_table_oid_{0};
 
   void load();
   void flush();

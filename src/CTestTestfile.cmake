@@ -7,5 +7,7 @@
 subdirs("buffer")
 subdirs("catalog")
 subdirs("common")
-subdirs("record")
+subdirs("concurrency")
+subdirs("datatype")
+subdirs("execution")
 subdirs("storage")

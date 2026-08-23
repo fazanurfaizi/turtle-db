@@ -35,6 +35,13 @@ public:
   PageId page_id() const;
   uint32_t tuple_count() const;
 
+  // Total number of slots ever allocated (active + deleted). Slot indices are
+  // valid in [0, slot_count()); tuple_count() only counts non-deleted slots.
+  uint32_t slot_count() const;
+
+  // True if slot_num is in range and holds a live (non-deleted) tuple.
+  bool is_slot_occupied(uint32_t slot_num) const;
+
 private:
   struct Header {
     PageId page_id_;

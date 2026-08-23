@@ -44,6 +44,17 @@ uint32_t SlottedPage::tuple_count() const {
   return this->header()->tuple_count_;
 }
 
+uint32_t SlottedPage::slot_count() const {
+  return this->header()->slot_count_;
+}
+
+bool SlottedPage::is_slot_occupied(uint32_t slot_num) const {
+  if (slot_num >= this->header()->slot_count_) {
+    return false;
+  }
+  return this->slots()[slot_num].length_ != 0;
+}
+
 SlottedPage::Header *SlottedPage::header() const {
   return reinterpret_cast<Header *>(page_->data());
 }

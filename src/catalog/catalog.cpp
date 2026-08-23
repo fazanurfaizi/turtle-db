@@ -9,8 +9,10 @@
 #include "turtle/catalog/catalog.hpp"
 #include "turtle/catalog/database.hpp"
 #include "turtle/catalog/metadata.hpp"
+#include "turtle/catalog/table_info.hpp"
 #include "turtle/common/util/binary_serializer.hpp"
 #include "turtle/storage/disk/disk_manager.hpp"
+#include "turtle/storage/table/table_heap.hpp"
 
 namespace turtle::catalog {
 
@@ -62,6 +64,43 @@ Database *Catalog::get_database(const std::string &database_name) {
 const Database *Catalog::get_database(const std::string &database_name) const {
   auto it = this->databases_.find(database_name);
   return (it == this->databases_.end()) ? nullptr : it->second.get();
+}
+
+TableInfo *Catalog::create_table(const std::string &table_name,
+                                 ColumnSchema schema) {
+  // Idempotent: re-creating an existing name returns the existing entry.
+  auto existing = this->table_oids_.find(table_name);
+  if (existing != this->table_oids_.end()) {
+    return this->tables_.at(existing->second).get();
+  }
+
+  TableOid oid = this->next_table_oid_++;
+
+  // Each table gets its own backing file, PostgreSQL-style, so its
+  // page-id space is independent of every other table.
+  auto table_path =
+      std::filesystem::path(this->db_dir_) / (table_name + ".tbl");
+  FileId file_id = this->disk_manager_->create_file(table_path.string());
+
+  auto heap = std::make_unique<storage::table::TableHeap>(this->bpm_, file_id);
+  auto info = std::make_unique<TableInfo>(table_name, std::move(schema),
+                                          std::move(heap), oid);
+  TableInfo *ptr = info.get();
+
+  this->tables_.emplace(oid, std::move(info));
+  this->table_oids_.emplace(table_name, oid);
+  return ptr;
+}
+
+TableInfo *Catalog::get_table(TableOid oid) {
+  auto it = this->tables_.find(oid);
+  return (it == this->tables_.end()) ? nullptr : it->second.get();
+}
+
+TableInfo *Catalog::get_table(const std::string &table_name) {
+  auto it = this->table_oids_.find(table_name);
+  return (it == this->table_oids_.end()) ? nullptr
+                                         : this->get_table(it->second);
 }
 
 Database *Catalog::create_database(const std::string &database_name) {
