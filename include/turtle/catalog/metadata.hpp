@@ -23,10 +23,10 @@ public:
   }
   void touch() { this->updated_at_ = std::chrono::system_clock::now(); }
 
-  const size_t &get_schema_count() const { return this->schema_count_; }
-  void set_schema_count(size_t total) { this->schema_count_ = total; }
-  void increase_schema() { this->schema_count_++; }
-  void decrease_schema() { this->schema_count_--; }
+  const size_t &get_namespace_count() const { return this->namespace_count_; }
+  void set_namespace_count(size_t total) { this->namespace_count_ = total; }
+  void increase_namespace() { this->namespace_count_++; }
+  void decrease_namespace() { this->namespace_count_--; }
 
   const size_t &get_table_count() const { return this->table_count_; }
   void set_table_count(size_t total) { this->table_count_ = total; }
@@ -43,8 +43,8 @@ private:
   std::string meta_checksum;
   std::string db_checksum;
 
-  size_t schema_count_{0};
+  size_t namespace_count_{0};
   size_t table_count_{0};
 };
 
-} // namespace Turtle::Catalog
+} // namespace turtle::catalog

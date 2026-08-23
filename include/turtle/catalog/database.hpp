@@ -5,7 +5,7 @@
 #include <unordered_map>
 
 #include "turtle/catalog/metadata.hpp"
-#include "turtle/catalog/schema.hpp"
+#include "turtle/catalog/namespace.hpp"
 
 namespace turtle::catalog {
 
@@ -16,27 +16,27 @@ public:
   const Metadata &get_metadata() const { return this->meta_; }
   Metadata &get_metadata() { return this->meta_; }
 
-  Schema *create_schema(const std::string &schema_name);
+  Namespace *create_namespace(const std::string &namespace_name);
 
-  const std::unordered_map<std::string, std::unique_ptr<Schema>> &
-  get_schemas() const noexcept {
-    return this->schemas_;
+  const std::unordered_map<std::string, std::unique_ptr<Namespace>> &
+  get_namespaces() const noexcept {
+    return this->namespaces_;
   }
 
-  Schema *get_schema(const std::string &schema_name) {
-    auto it = this->schemas_.find(schema_name);
-    return (it == this->schemas_.end()) ? nullptr : it->second.get();
+  Namespace *get_namespace(const std::string &namespace_name) {
+    auto it = this->namespaces_.find(namespace_name);
+    return (it == this->namespaces_.end()) ? nullptr : it->second.get();
   }
 
   // read-only access
-  const Schema *get_schema(const std::string &schema_name) const {
-    auto it = this->schemas_.find(schema_name);
-    return (it == this->schemas_.end()) ? nullptr : it->second.get();
+  const Namespace *get_namespace(const std::string &namespace_name) const {
+    auto it = this->namespaces_.find(namespace_name);
+    return (it == this->namespaces_.end()) ? nullptr : it->second.get();
   }
 
 private:
   Metadata &meta_;
-  std::unordered_map<std::string, std::unique_ptr<Schema>> schemas_;
+  std::unordered_map<std::string, std::unique_ptr<Namespace>> namespaces_;
 };
 
-} // namespace Turtle::Catalog
+} // namespace turtle::catalog

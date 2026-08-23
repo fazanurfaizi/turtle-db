@@ -47,7 +47,7 @@ Metadata Catalog::get_database_info(const std::string &database_name) const {
   // return {.name = meta->get_db_name(),
   //         .db_file_path = meta->get_db_file_path(),
   //   .meta_file_path
-  //         .schema_count = meta->get_schema_count(),
+  //         .namespace_count = meta->get_namespace_count(),
   //         .table_count = meta->get_table_count(),
   //         .created_at = meta->get_created_at(),
   //         .updated_at = meta->get_updated_at()};
@@ -90,7 +90,7 @@ Database *Catalog::create_database(const std::string &database_name) {
     this->metadatas_.emplace(database_name, std::move(metadata));
     this->databases_.emplace(database_name, std::move(db));
 
-    ptr->create_schema("public");
+    ptr->create_namespace("public");
     return ptr;
   } catch (const std::exception &e) {
     std::cerr << "Error creating database file: " << e.what() << std::endl;
@@ -195,12 +195,13 @@ void Catalog::save_database_metadata(const Database &db,
   util::write_binary(ofs, metadata.get_created_at());
   util::write_binary(ofs, metadata.get_updated_at());
 
-  // Schemas
-  uint32_t schema_count = static_cast<uint32_t>(metadata.get_schema_count());
-  util::write_binary(ofs, schema_count);
+  // Namespaces
+  uint32_t namespace_count =
+      static_cast<uint32_t>(metadata.get_namespace_count());
+  util::write_binary(ofs, namespace_count);
 
-  for (const auto &schema_entry : db.get_schemas()) {
-    util::write_string(ofs, schema_entry.first);
+  for (const auto &namespace_entry : db.get_namespaces()) {
+    util::write_string(ofs, namespace_entry.first);
 
     uint32_t table_count = static_cast<uint32_t>(metadata.get_table_count());
     util::write_binary(ofs, table_count);
@@ -229,13 +230,12 @@ void Catalog::load_database_metadata(Database &db,
   util::read_binary(ifs, created_at);
   util::read_binary(ifs, updated_at);
 
-  uint32_t schema_count;
-  util::read_binary(ifs, schema_count);
+  uint32_t namespace_count;
+  util::read_binary(ifs, namespace_count);
 
-  for (uint32_t i = 0; i < schema_count; ++i) {
-    const std::string schema_name = util::read_string(ifs);
-    // Schema *schema =
-    db.create_schema(schema_name);
+  for (uint32_t i = 0; i < namespace_count; ++i) {
+    const std::string namespace_name = util::read_string(ifs);
+    db.create_namespace(namespace_name);
 
     uint32_t table_count;
     util::read_binary(ifs, table_count);

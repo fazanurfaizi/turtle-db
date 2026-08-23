@@ -8,9 +8,13 @@
 
 namespace turtle::catalog {
 
-class Schema {
+// A Namespace is a container of tables (Postgres calls this a schema; the SQL
+// keyword stays CREATE SCHEMA, but the type is named Namespace to avoid
+// colliding with ColumnSchema, which describes a row's column layout).
+class Namespace {
 public:
-  explicit Schema(std::string schema_name) : name_(std::move(schema_name)) {}
+  explicit Namespace(std::string namespace_name)
+      : name_(std::move(namespace_name)) {}
 
   const std::string &get_name() const { return this->name_; }
 
@@ -30,5 +34,5 @@ private:
   std::unordered_map<std::string, std::unique_ptr<Table>> tables_;
 };
 
-} // namespace Turtle::Catalog
+} // namespace turtle::catalog
 

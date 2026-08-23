@@ -2,21 +2,21 @@
 
 namespace turtle::catalog {
 
-Schema *Database::create_schema(const std::string &schema_name) {
-  // Check if schema already exists
-  auto it = this->schemas_.find(schema_name);
-  if (it != this->schemas_.end()) {
+Namespace *Database::create_namespace(const std::string &namespace_name) {
+  // Check if namespace already exists
+  auto it = this->namespaces_.find(namespace_name);
+  if (it != this->namespaces_.end()) {
     return it->second.get();
   }
 
-  // Insert new schema
-  auto schema = std::make_unique<Schema>(schema_name);
-  auto *schema_ptr = schema.get();
-  this->schemas_.emplace(schema_name, std::move(schema));
+  // Insert new namespace
+  auto ns = std::make_unique<Namespace>(namespace_name);
+  auto *ns_ptr = ns.get();
+  this->namespaces_.emplace(namespace_name, std::move(ns));
 
-  this->meta_.increase_schema();
+  this->meta_.increase_namespace();
   this->meta_.touch();
-  return schema_ptr;
+  return ns_ptr;
 }
 
-} // namespace Turtle::Catalog
+} // namespace turtle::catalog
