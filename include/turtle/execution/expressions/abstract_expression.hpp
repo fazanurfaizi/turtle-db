@@ -8,12 +8,13 @@
 
 #include "fmt/format.h"
 #include "turtle/catalog/column.hpp"
+#include "turtle/catalog/column_schema.hpp"
 #include "turtle/catalog/table.hpp"
 #include "turtle/datatype/value.hpp"
 #include "turtle/storage/table/tuple.hpp"
 
 #define TURTLE_EXPR_CLONE_WITH_CHILDREN(cname)                                 \
-  auto CloneWithChildren(std::vector<AbstractExpressionRef> children) const    \
+  auto clone_with_children(std::vector<AbstractExpressionRef> children) const  \
       -> std::unique_ptr<AbstractExpression>                                   \
           override {                                                           \
     auto expr = cname(*this);                                                  \
@@ -50,8 +51,8 @@ public:
   /**
    * @return The Value obtained by evaluating the tuple with given schema
    */
-  virtual auto evalute(const storage::table::Tuple *tuple,
-                       const catalog::Table &table) const
+  virtual auto evaluate(const storage::table::Tuple *tuple,
+                        const catalog::ColumnSchema &schema) const
       -> datatype::Value = 0;
 
   /**
@@ -63,9 +64,9 @@ public:
    * @return The value obtained by evaluating a JOIN on the left and right
    */
   virtual auto evaluate_join(const storage::table::Tuple *left_tuple,
-                             const catalog::Table &left_Table,
+                             const catalog::ColumnSchema &left_schema,
                              const storage::table::Tuple *right_tuple,
-                             const catalog::Table &right_table) const
+                             const catalog::ColumnSchema &right_schema) const
       -> datatype::Value = 0;
 
   /**

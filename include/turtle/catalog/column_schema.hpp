@@ -30,6 +30,11 @@ public:
     throw std::runtime_error("Column not found: " + col_name);
   }
 
+  /** @return the number of columns in the schema for the tuple */
+  auto get_column_count() const -> uint32_t {
+    return static_cast<uint32_t>(this->columns_.size());
+  }
+
   auto to_string() const -> std::string {
     std::string out = "(";
     for (std::size_t i = 0; i < this->columns_.size(); ++i) {

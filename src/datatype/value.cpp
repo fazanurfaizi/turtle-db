@@ -1,4 +1,6 @@
 #include "turtle/datatype/value.hpp"
+#include "turtle/catalog/column.hpp"
+#include "turtle/datatype/data_types.hpp"
 
 #include <cstring>
 #include <stdexcept>
@@ -120,6 +122,15 @@ bool Value::check_comparable(const Value &o) const {
 
 std::vector<double> Value::vector() const {
   throw std::runtime_error("Vector method not fully implemented yet.");
+}
+
+auto Value::column() const -> turtle::catalog::Column {
+  switch (this->data_type()) {
+  case DataType::VARCHAR:
+    return catalog::Column{"<val>", DataType::VARCHAR, this->storage_size()};
+  default:
+    return catalog::Column{"<val>", DataType::INTEGER};
+  }
 }
 
 } // namespace turtle::datatype
