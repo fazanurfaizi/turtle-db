@@ -14,8 +14,13 @@
 #include "turtle/datatype/data_types.hpp"
 #include "turtle/datatype/value.hpp"
 #include "turtle/execution/executor_context.hpp"
+#include "turtle/execution/executors/insert_executor.hpp"
 #include "turtle/execution/executors/seq_scan_executor.hpp"
+#include "turtle/execution/executors/values_executor.hpp"
+#include "turtle/execution/expressions/constant_value_expression.hpp"
+#include "turtle/execution/plans/insert_plan.hpp"
 #include "turtle/execution/plans/seq_scan_plan.hpp"
+#include "turtle/execution/plans/values_plan.hpp"
 #include "turtle/storage/disk/disk_manager.hpp"
 #include "turtle/storage/table/table_heap.hpp"
 #include "turtle/storage/table/tuple.hpp"
@@ -40,25 +45,74 @@ int main() {
   catalog::TableInfo *table_info =
       catalog->create_table("people", catalog::ColumnSchema(cols));
 
-  // Insert a couple of tuples directly into the table heap.
-  auto make_tuple = [&](int32_t id, std::string &name, int32_t age) {
-    std::vector<datatype::Value> vals;
-    vals.emplace_back(datatype::DataType::INTEGER, id);
-    vals.emplace_back(datatype::DataType::VARCHAR, name);
-    vals.emplace_back(datatype::DataType::INTEGER, age);
-    return storage::table::Tuple(&table_info->schema_, vals);
-  };
+  // Build values to insert using the executor pipeline.
+  // Create a row of ConstantValueExpressions for each tuple.
+  std::vector<std::vector<execution::expressions::AbstractExpressionRef>>
+      values;
 
-  RecordId rid;
-  for (int id = 1; id <= 100; ++id) {
+  for (int id = 1; id <= 1000; ++id) {
+    std::vector<execution::expressions::AbstractExpressionRef> row;
+    row.push_back(
+        std::make_shared<execution::expressions::ConstantValueExpression>(
+            datatype::Value(datatype::DataType::INTEGER,
+                            static_cast<int32_t>(id))));
+
     std::string name = "user_" + std::to_string(id);
-    table_info->table_->insert_tuple(make_tuple(id, name, id * 7), &rid);
+    row.push_back(
+        std::make_shared<execution::expressions::ConstantValueExpression>(
+            datatype::Value(datatype::DataType::VARCHAR, name)));
+
+    row.push_back(
+        std::make_shared<execution::expressions::ConstantValueExpression>(
+            datatype::Value(datatype::DataType::INTEGER,
+                            static_cast<int32_t>(id * 7))));
+
+    values.push_back(row);
   }
 
-  // Build the plan + executor context, then run the plan-driven scan.
+  // Build the executor context and pipeline.
+  execution::ExecutorContext exec_ctx(catalog.get(), bpm.get(), false);
+
+  // Create ValuesPlanNode to emit the constant tuples.
+  execution::plans::ValuesPlanNode values_plan(schema_ref, values);
+
+  // Create output schema for InsertExecutor: single INTEGER column for row
+  // count.
+  std::vector<catalog::Column> insert_out_cols;
+  insert_out_cols.emplace_back("count", datatype::DataType::INTEGER);
+  auto insert_output_schema =
+      std::make_shared<const catalog::ColumnSchema>(insert_out_cols);
+
+  // Create InsertPlanNode with the values as child.
+  execution::plans::InsertPlanNode insert_plan(
+      insert_output_schema,
+      std::make_shared<execution::plans::ValuesPlanNode>(values_plan),
+      table_info->oid_);
+
+  // Create ValuesExecutor to produce the constant tuples.
+  auto values_exec = std::make_unique<execution::executors::ValuesExecutor>(
+      &exec_ctx, &values_plan);
+
+  // Create InsertExecutor to insert the tuples.
+  execution::executors::InsertExecutor insert_exec(&exec_ctx, &insert_plan,
+                                                   std::move(values_exec));
+
+  // Execute the insert.
+  std::cout << "--- Inserting 100 rows via executor pipeline ---\n";
+  insert_exec.init();
+  std::vector<storage::table::Tuple> insert_batch;
+  std::vector<RecordId> insert_rids;
+  while (insert_exec.next(&insert_batch, &insert_rids, 256)) {
+    if (!insert_batch.empty()) {
+      auto count_val =
+          insert_batch[0].value(&insert_exec.get_output_schema(), 0);
+      fmt::print("Inserted {} rows\n", count_val);
+    }
+  }
+
+  // Build the plan for scan, then run the plan-driven scan to verify insertion.
   execution::plans::SeqScanPlanNode plan(schema_ref, table_info->oid_,
                                          "people");
-  execution::ExecutorContext exec_ctx(catalog.get(), bpm.get(), false);
   execution::executors::SeqScanExecutor scan(&exec_ctx, &plan);
 
   std::cout << "--- SeqScan over table='" << plan.table_name_
