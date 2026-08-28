@@ -32,6 +32,7 @@ class Value {
   friend class Type;
   friend class NumericType;
   friend class IntegerParentType;
+  friend class VarcharType;
 
 public:
   explicit Value(const DataType type) : manage_data_(false), data_type_(type) {

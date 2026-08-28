@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <iostream>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "fmt/base.h"
@@ -31,6 +32,7 @@ int main() {
   // Define the table schema: (id INTEGER, age INTEGER).
   std::vector<catalog::Column> cols;
   cols.emplace_back("id", datatype::DataType::INTEGER);
+  cols.emplace_back("name", datatype::DataType::VARCHAR);
   cols.emplace_back("age", datatype::DataType::INTEGER);
   auto schema_ref = std::make_shared<const catalog::ColumnSchema>(cols);
 
@@ -39,16 +41,18 @@ int main() {
       catalog->create_table("people", catalog::ColumnSchema(cols));
 
   // Insert a couple of tuples directly into the table heap.
-  auto make_tuple = [&](int32_t id, int32_t age) {
+  auto make_tuple = [&](int32_t id, std::string &name, int32_t age) {
     std::vector<datatype::Value> vals;
     vals.emplace_back(datatype::DataType::INTEGER, id);
+    vals.emplace_back(datatype::DataType::VARCHAR, name);
     vals.emplace_back(datatype::DataType::INTEGER, age);
     return storage::table::Tuple(&table_info->schema_, vals);
   };
 
   RecordId rid;
   for (int id = 1; id <= 100; ++id) {
-    table_info->table_->insert_tuple(make_tuple(id, id * 7), &rid);
+    std::string name = "user_" + std::to_string(id);
+    table_info->table_->insert_tuple(make_tuple(id, name, id * 7), &rid);
   }
 
   // Build the plan + executor context, then run the plan-driven scan.

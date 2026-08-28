@@ -1,5 +1,6 @@
 #include "turtle/datatype/type.hpp"
 #include "turtle/datatype/integer_type.hpp"
+#include "turtle/datatype/varchar_type.hpp"
 
 namespace turtle::datatype {
 
@@ -11,7 +12,7 @@ Type *Type::k_types[] = {
     nullptr,                            // SMALLINT
     nullptr,                            // BIGINT
     nullptr,                            // DECIMAL
-    nullptr,                            // VARCHAR
+    new VarcharType(DataType::VARCHAR), // VARCHAR
     nullptr,                            // TIMESTAMP
     nullptr                             // Padding for safety
 };

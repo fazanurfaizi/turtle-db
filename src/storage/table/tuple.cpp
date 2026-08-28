@@ -101,21 +101,28 @@ void Tuple::deserialize_from(const char *storage, uint32_t size) {
 
 datatype::Value Tuple::value(const catalog::ColumnSchema *schema,
                              uint32_t column_idx) const {
-  // Get schema metadata
   const auto &columns = schema->get_columns();
   TURTLE_ASSERT(column_idx < columns.size(), "Column is out of range");
 
-  auto column_count = columns.size();
-  auto null_bitmap_size = (column_count + 7) / 8;
+  size_t column_count = columns.size();
+  size_t null_bitmap_size = (column_count + 7) / 8;
 
-  // Calculate byte offset of this column
-  auto offset = null_bitmap_size;
+  // Calculate byte offset by summing sizes of all columns before this one
+  size_t offset = null_bitmap_size;
   for (uint32_t i = 0; i < column_idx; ++i) {
-    offset += static_cast<uint32_t>(
-        datatype::Type::get_type_size(columns[i].get_type()));
+    auto col_type = columns[i].get_type();
+    if (col_type == datatype::DataType::VARCHAR) {
+      // For VARCHAR, read the length prefix (first 4 bytes) and skip
+      // accordingly
+      uint32_t len = *reinterpret_cast<const uint32_t *>(this->data_ + offset);
+      offset += 4 + len;
+    } else {
+      // Fixed-size type: add its static size
+      offset += static_cast<uint32_t>(datatype::Type::get_type_size(col_type));
+    }
   }
 
-  // Check if column is NULL by inspecting bitmap
+  // Check if NULL via bitmap
   char *bitmap_ptr = this->data_;
   bool is_null = (bitmap_ptr[column_idx / 8] & (1 << (column_idx % 8))) != 0;
 
@@ -123,7 +130,7 @@ datatype::Value Tuple::value(const catalog::ColumnSchema *schema,
     return datatype::Value();
   }
 
-  // Deserialize the value from buffer at offset
+  // Deserialize value from buffer at calculated offset
   auto *type = datatype::Type::get_instance(columns[column_idx].get_type());
   return type->deserialize(this->data_ + offset);
 }
