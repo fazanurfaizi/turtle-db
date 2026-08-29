@@ -1,5 +1,16 @@
 test_db/
 
+# Compiled test executables (extensionless, emitted directly into tests/ by the
+# GLOB_RECURSE rule in tests/CMakeLists.txt as <dir>_<file>). Anchored to
+# /tests/ and matched by suffix so the *_test.cpp / *_gtest.cpp sources in
+# tests/<subdir>/ are NOT ignored.
+/tests/*_gtest
+/tests/*_test
+
+# Compiled demo executable built next to its source by src/CMakeLists.txt
+# (add_executable(main main.cpp)). The src/main.cpp source is unaffected.
+/src/main
+
 # Prerequisites
 *.d
 
@@ -50,6 +61,7 @@ build-*/
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
+CTestTestfile.cmake
 Makefile
 install_manifest.txt 
 compile_commands.json
