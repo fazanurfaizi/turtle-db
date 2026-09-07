@@ -37,7 +37,7 @@ public:
   auto compare_greater_than_equals(const Value &left, const Value &right) const
       -> CmpBool override;
 
-  auto cast_as(const Value &val, DataType type_id) const -> Value override;
+  auto cast_as(const Value &val, DataType data_type) const -> Value override;
 
   auto to_string(const Value &val) const -> std::string override;
 

@@ -11,18 +11,18 @@ namespace turtle::datatype {
 #define INT_COMPARE_FUNC(OP)                                                   \
   switch (right.data_type()) {                                                 \
   case DataType::TINYINT:                                                      \
-    return get_cmp_bool(left.GetAs<int32_t>() OP right.GetAs<int8_t>());       \
+    return get_cmp_bool(left.get_as<int32_t>() OP right.get_as<int8_t>());     \
   case DataType::SMALLINT:                                                     \
-    return get_cmp_bool(left.GetAs<int32_t>() OP right.GetAs<int16_t>());      \
+    return get_cmp_bool(left.get_as<int32_t>() OP right.get_as<int16_t>());    \
   case DataType::INTEGER:                                                      \
-    return get_cmp_bool(left.GetAs<int32_t>() OP right.GetAs<int32_t>());      \
+    return get_cmp_bool(left.get_as<int32_t>() OP right.get_as<int32_t>());    \
   case DataType::BIGINT:                                                       \
-    return get_cmp_bool(left.GetAs<int32_t>() OP right.GetAs<int64_t>());      \
+    return get_cmp_bool(left.get_as<int32_t>() OP right.get_as<int64_t>());    \
   case DataType::DECIMAL:                                                      \
-    return get_cmp_bool(left.GetAs<int32_t>() OP right.GetAs<double>());       \
+    return get_cmp_bool(left.get_as<int32_t>() OP right.get_as<double>());     \
   case DataType::VARCHAR: {                                                    \
     auto r_value = right.cast_as(DataType::INTEGER);                           \
-    return get_cmp_bool(left.GetAs<int32_t>() OP r_value.GetAs<int32_t>());    \
+    return get_cmp_bool(left.get_as<int32_t>() OP r_value.get_as<int32_t>());  \
   }                                                                            \
   default:                                                                     \
     break;                                                                     \
@@ -40,7 +40,7 @@ namespace turtle::datatype {
     return METHOD<int32_t, int64_t>(left, right);                              \
   case DataType::DECIMAL:                                                      \
     return Value(DataType::DECIMAL,                                            \
-                 left.GetAs<int32_t>() OP right.GetAs<double>());              \
+                 left.get_as<int32_t>() OP right.get_as<double>());            \
   case DataType::VARCHAR: {                                                    \
     auto r_value = right.cast_as(DataType::INTEGER);                           \
     return METHOD<int32_t, int32_t>(left, r_value);                            \
@@ -52,7 +52,7 @@ namespace turtle::datatype {
 IntegerType::IntegerType(DataType type) : IntegerParentType(type) {}
 
 auto IntegerType::is_zero(const Value &val) const -> bool {
-  return (val.GetAs<int32_t>() == 0);
+  return (val.get_as<int32_t>() == 0);
 }
 
 auto IntegerType::add(const Value &left, const Value &right) const -> Value {
@@ -127,7 +127,7 @@ auto IntegerType::modulo(const Value &left, const Value &right) const -> Value {
     return modulo_value<int32_t, int64_t>(left, right);
   case DataType::DECIMAL:
     return Value(DataType::DECIMAL,
-                 val_mod(left.GetAs<int32_t>(), right.GetAs<double>()));
+                 val_mod(left.get_as<int32_t>(), right.get_as<double>()));
   case DataType::VARCHAR: {
     auto r_value = right.cast_as(DataType::INTEGER);
     return modulo_value<int32_t, int32_t>(left, r_value);
@@ -145,10 +145,10 @@ auto IntegerType::sqrt(const Value &val) const -> Value {
     return operate_null(val, val);
   }
 
-  if (val.GetAs<int32_t>() < 0) {
+  if (val.get_as<int32_t>() < 0) {
     throw std::runtime_error("Cannot take square root of a negative number.");
   }
-  return Value(DataType::DECIMAL, std::sqrt(val.GetAs<int32_t>()));
+  return Value(DataType::DECIMAL, std::sqrt(val.get_as<int32_t>()));
 }
 
 auto IntegerType::min(const Value &left, const Value &right) const -> Value {
@@ -286,65 +286,65 @@ auto IntegerType::to_string(const Value &val) const -> std::string {
   if (val.is_null()) {
     return "integer_null";
   }
-  return std::to_string(val.GetAs<int32_t>());
+  return std::to_string(val.get_as<int32_t>());
 }
 
 void IntegerType::serialize(const Value &val, char *storage) const {
-  int32_t int_val = val.GetAs<int32_t>();
+  int32_t int_val = val.get_as<int32_t>();
   std::memcpy(storage, &int_val, sizeof(int32_t));
 }
 
 auto IntegerType::deserialize(const char *storage) const -> Value {
   int32_t val;
   std::memcpy(&val, storage, sizeof(int32_t));
-  return Value(get_data_type(), val);
+  return Value(this->data_type(), val);
 }
 
 auto IntegerType::copy(const Value &val) const -> Value {
   assert(val.check_integer());
-  return Value(val.data_type(), val.GetAs<int32_t>());
+  return Value(val.data_type(), val.get_as<int32_t>());
 }
 
-auto IntegerType::cast_as(const Value &val, const DataType type_id) const
+auto IntegerType::cast_as(const Value &val, const DataType data_type) const
     -> Value {
-  switch (type_id) {
+  switch (data_type) {
   case DataType::TINYINT: {
     if (val.is_null()) {
-      return Value(type_id, static_cast<int8_t>(TURTLE_INT8_NULL));
+      return Value(data_type, static_cast<int8_t>(TURTLE_INT8_NULL));
     }
-    if (val.GetAs<int32_t>() > TURTLE_INT8_MAX ||
-        val.GetAs<int32_t>() < TURTLE_INT8_MIN) {
+    if (val.get_as<int32_t>() > TURTLE_INT8_MAX ||
+        val.get_as<int32_t>() < TURTLE_INT8_MIN) {
       throw std::runtime_error("Numeric value out of range.");
     }
-    return Value(type_id, static_cast<int8_t>(val.GetAs<int32_t>()));
+    return Value(data_type, static_cast<int8_t>(val.get_as<int32_t>()));
   }
   case DataType::SMALLINT: {
     if (val.is_null()) {
-      return Value(type_id, static_cast<int16_t>(TURTLE_INT16_NULL));
+      return Value(data_type, static_cast<int16_t>(TURTLE_INT16_NULL));
     }
-    if (val.GetAs<int32_t>() > TURTLE_INT16_MAX ||
-        val.GetAs<int32_t>() < TURTLE_INT16_MIN) {
+    if (val.get_as<int32_t>() > TURTLE_INT16_MAX ||
+        val.get_as<int32_t>() < TURTLE_INT16_MIN) {
       throw std::runtime_error("Numeric value out of range.");
     }
-    return Value(type_id, static_cast<int16_t>(val.GetAs<int32_t>()));
+    return Value(data_type, static_cast<int16_t>(val.get_as<int32_t>()));
   }
   case DataType::INTEGER: {
     if (val.is_null()) {
-      return Value(type_id, static_cast<int32_t>(TURTLE_INT32_NULL));
+      return Value(data_type, static_cast<int32_t>(TURTLE_INT32_NULL));
     }
-    return Value(type_id, static_cast<int32_t>(val.GetAs<int32_t>()));
+    return Value(data_type, static_cast<int32_t>(val.get_as<int32_t>()));
   }
   case DataType::BIGINT: {
     if (val.is_null()) {
-      return Value(type_id, static_cast<int64_t>(TURTLE_INT64_NULL));
+      return Value(data_type, static_cast<int64_t>(TURTLE_INT64_NULL));
     }
-    return Value(type_id, static_cast<int64_t>(val.GetAs<int32_t>()));
+    return Value(data_type, static_cast<int64_t>(val.get_as<int32_t>()));
   }
   case DataType::DECIMAL: {
     if (val.is_null()) {
-      return Value(type_id, static_cast<double>(TURTLE_DECIMAL_NULL));
+      return Value(data_type, static_cast<double>(TURTLE_DECIMAL_NULL));
     }
-    return Value(type_id, static_cast<double>(val.GetAs<int32_t>()));
+    return Value(data_type, static_cast<double>(val.get_as<int32_t>()));
   }
   case DataType::VARCHAR: {
     if (val.is_null()) {
@@ -364,7 +364,7 @@ auto IntegerType::get_storage_size(const Value &val) const -> uint32_t {
 
 auto IntegerType::get_data(const Value &val) const -> const char * {
   // We throw here because inlined types (like integers) should be accessed
-  // via GetAs<int32_t>(), not via raw char pointers (which are for VARCHARs).
+  // via get_as<int32_t>(), not via raw char pointers (which are for VARCHARs).
   throw std::runtime_error(
       "get_data() should not be called on inlined Integer types.");
 }

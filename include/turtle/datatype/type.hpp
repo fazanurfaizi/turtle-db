@@ -14,13 +14,15 @@ enum class CmpBool { CmpFalse = 0, CmpTrue = 1, CmpNull = 2 };
 
 class Type {
 public:
+  DataType data_type_;
+
   explicit Type(DataType data_type) : data_type_(data_type) {}
 
   virtual ~Type() = default;
 
   static auto get_type_size(DataType data_type) -> uint64_t;
 
-  auto is_coercable_from(DataType data_type) const -> bool;
+  virtual auto is_coercable_from(DataType data_type) const -> bool;
 
   static auto data_type_to_string(DataType data_type) -> std::string;
 
@@ -31,7 +33,7 @@ public:
     return k_types[static_cast<std::size_t>(data_type)];
   }
 
-  inline auto get_data_type() const -> DataType { return this->data_type_; }
+  inline auto data_type() const -> DataType { return this->data_type_; }
 
   // Comparison functions
   virtual auto compare_equals(const Value &left, const Value &right) const
@@ -83,8 +85,6 @@ public:
   virtual auto get_storage_size(const Value &value) const -> uint32_t;
 
 private:
-  DataType data_type_;
-
   // Singleton instance
   static Type *k_types[10];
 };

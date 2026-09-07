@@ -35,6 +35,18 @@ class Value {
   friend class VarcharType;
 
 public:
+  union Val {
+    int8_t boolean_;
+    int8_t tinyint_;
+    int16_t smallint_;
+    int32_t integer_;
+    int64_t bigint_;
+    double decimal_;
+    uint64_t timestamp_;
+    char *varlen_;
+    const char *const_varlen_;
+  } value_;
+
   explicit Value(const DataType type) : manage_data_(false), data_type_(type) {
     this->size_.len_ = TURTLE_VALUE_NULL;
   }
@@ -63,7 +75,7 @@ public:
 
   // VARCHAR
   Value(DataType type, const char *data, uint32_t len, bool manage_data);
-  Value(DataType type, std::string &data);
+  Value(DataType type, const std::string &data);
   Value(DataType type, const std::vector<double> &data);
 
   Value() : Value(DataType::INVALID) {}
@@ -95,7 +107,7 @@ public:
     return Type::get_instance(this->data_type_)->get_data(*this);
   }
 
-  template <class T> inline auto GetAs() const -> T {
+  template <class T> inline auto get_as() const -> T {
     return *reinterpret_cast<const T *>(&value_);
   }
 
@@ -175,13 +187,13 @@ public:
   // space, or whether we must store only a reference to this value. If inlined
   // is false, we may use the provided data pool to allocate space for this
   // value, storing a reference into the allocated pool space in the storage.
-  inline void SerializeTo(char *storage) const {
+  inline void serialize_to(char *storage) const {
     Type::get_instance(this->data_type_)->serialize(*this, storage);
   }
 
   // Deserialize a value of the given type from the given storage space.
-  inline static auto DeserializeFrom(const char *storage,
-                                     const DataType data_type) -> Value {
+  inline static auto deserialize_from(const char *storage,
+                                      const DataType data_type) -> Value {
     return Type::get_instance(data_type)->deserialize(storage);
   }
 
@@ -197,18 +209,6 @@ public:
 private:
   bool manage_data_;
   DataType data_type_;
-
-  union Val {
-    int8_t boolean_;
-    int8_t tinyint_;
-    int16_t smallint_;
-    int32_t integer_;
-    int64_t bigint_;
-    double decimal_;
-    uint64_t timestamp_;
-    char *varlen_;
-    const char *const_varlen_;
-  } value_;
 
   union {
     uint32_t len_;

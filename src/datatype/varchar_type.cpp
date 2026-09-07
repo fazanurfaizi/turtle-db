@@ -1,4 +1,5 @@
 #include "turtle/datatype/varchar_type.hpp"
+#include "turtle/datatype/data_types.hpp"
 #include "turtle/datatype/value.hpp"
 #include <cassert>
 #include <cstring>
@@ -18,8 +19,8 @@ auto VarcharType::compare_equals(const Value &left, const Value &right) const
   return get_cmp_bool(left_str == right_str);
 }
 
-auto VarcharType::compare_not_equals(const Value &left, const Value &right) const
-    -> CmpBool {
+auto VarcharType::compare_not_equals(const Value &left,
+                                     const Value &right) const -> CmpBool {
   if (left.is_null() || right.is_null()) {
     return CmpBool::CmpNull;
   }
@@ -39,7 +40,8 @@ auto VarcharType::compare_less_than(const Value &left, const Value &right) const
 }
 
 auto VarcharType::compare_less_than_equals(const Value &left,
-                                           const Value &right) const -> CmpBool {
+                                           const Value &right) const
+    -> CmpBool {
   if (left.is_null() || right.is_null()) {
     return CmpBool::CmpNull;
   }
@@ -48,8 +50,8 @@ auto VarcharType::compare_less_than_equals(const Value &left,
   return get_cmp_bool(left_str <= right_str);
 }
 
-auto VarcharType::compare_greater_than(const Value &left, const Value &right) const
-    -> CmpBool {
+auto VarcharType::compare_greater_than(const Value &left,
+                                       const Value &right) const -> CmpBool {
   if (left.is_null() || right.is_null()) {
     return CmpBool::CmpNull;
   }
@@ -173,7 +175,7 @@ auto VarcharType::is_zero(const Value &) const -> bool {
 }
 
 auto VarcharType::is_inlined(const Value &val) const -> bool {
-  return false;  // VARCHAR is not inlined, stored as pointer
+  return false; // VARCHAR is not inlined, stored as pointer
 }
 
 } // namespace turtle::datatype
