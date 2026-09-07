@@ -6,6 +6,7 @@
 #include "fmt/format.h"
 #include "turtle/catalog/column_schema.hpp"
 #include "turtle/common/config.hpp"
+#include "turtle/execution/expressions/abstract_expression.hpp"
 #include "turtle/execution/plans/abstract_plan.hpp"
 
 namespace turtle::execution::plans {
@@ -24,7 +25,7 @@ public:
   /**
    * The predicate to filter in seqscan.
    */
-  // expressions::AbstractExpressionRef filter_predicate_;
+  expressions::AbstractExpressionRef filter_predicate_;
 
   /**
    * Construct a new SeqScanPlanNode instance.
@@ -32,9 +33,11 @@ public:
    * @param table_oid The identifier of table to be scanne
    */
   SeqScanPlanNode(catalog::ColumnSchemaRef output, TableOid table_oid,
-                  std::string table_name)
+                  std::string table_name,
+                  expressions::AbstractExpressionRef filter_predicate = nullptr)
       : AbstractPlanNode(std::move(output), {}), table_oid_{table_oid},
-        table_name_(std::move(table_name)) {}
+        table_name_(std::move(table_name)),
+        filter_predicate_(std::move(filter_predicate)) {}
 
   /** @return The type of the plan node */
   auto get_type() const -> PlanType override { return PlanType::SeqScan; }
@@ -49,11 +52,10 @@ public:
 
 protected:
   auto plan_node_to_string() const -> std::string override {
-    // if (this->filter_predicate_) {
-    //   return fmt::format("SeqScan {{ table={}, filter={} }}",
-    //   this->table_name_,
-    //                      this->filter_predicate_);
-    // }
+    if (this->filter_predicate_) {
+      return fmt::format("SeqScan {{ table={}, filter={} }}", this->table_name_,
+                         this->filter_predicate_);
+    }
     return fmt::format("SeqScan {{ table={} }}", this->table_name_);
   }
 };

@@ -32,6 +32,13 @@ class Value {
   friend class Type;
   friend class NumericType;
   friend class IntegerParentType;
+  friend class TinyintType;
+  friend class SmallintType;
+  friend class IntegerType;
+  friend class BigintType;
+  friend class DecimalType;
+  friend class TimestampType;
+  friend class BooleanType;
   friend class VarcharType;
 
 public:

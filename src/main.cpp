@@ -17,10 +17,14 @@
 #include "turtle/datatype/value.hpp"
 #include "turtle/datatype/value_factory.hpp"
 #include "turtle/execution/executor_context.hpp"
+#include "turtle/execution/executors/filter_executor.hpp"
 #include "turtle/execution/executors/insert_executor.hpp"
 #include "turtle/execution/executors/seq_scan_executor.hpp"
 #include "turtle/execution/executors/values_executor.hpp"
+#include "turtle/execution/expressions/column_value_expression.hpp"
+#include "turtle/execution/expressions/comparison_expression.hpp"
 #include "turtle/execution/expressions/constant_value_expression.hpp"
+#include "turtle/execution/plans/filter_plan.hpp"
 #include "turtle/execution/plans/insert_plan.hpp"
 #include "turtle/execution/plans/seq_scan_plan.hpp"
 #include "turtle/execution/plans/values_plan.hpp"
@@ -146,22 +150,38 @@ int main() {
     }
   }
 
-  // Build the plan for scan, then run the plan-driven scan to verify insertion.
-  execution::plans::SeqScanPlanNode plan(schema_ref, table_info->oid_,
-                                         "people");
-  execution::executors::SeqScanExecutor scan(&exec_ctx, &plan);
+  auto pred = std::make_shared<execution::expressions::ComparisonExpression>(
+      std::make_shared<execution::expressions::ColumnValueExpression>(0, 6,
+                                                                      cols[6]),
+      std::make_shared<execution::expressions::ConstantValueExpression>(
+          datatype::ValueFactory::get_boolean_value(false)),
+      execution::expressions::ComparisonType::Equal);
 
-  std::cout << "--- SeqScan over table='" << plan.table_name_
-            << "' (oid=" << plan.get_table_oid() << ") ---\n";
+  // Build the scan plan + executor (the child that streams every row).
+  execution::plans::SeqScanPlanNode scan_plan(schema_ref, table_info->oid_,
+                                              "people");
+  auto scan_exec = std::make_unique<execution::executors::SeqScanExecutor>(
+      &exec_ctx, &scan_plan);
 
-  scan.init();
+  // Wrap the scan in a Filter that applies the predicate. Output schema is the
+  // child's schema, since Filter neither adds nor drops columns.
+  execution::plans::FilterPlanNode filter_plan(
+      schema_ref, pred,
+      std::make_shared<execution::plans::SeqScanPlanNode>(scan_plan));
+  execution::executors::FilterExecutor filter_exec(&exec_ctx, &filter_plan,
+                                                   std::move(scan_exec));
+
+  std::cout << "--- Filtered SeqScan over table='" << scan_plan.table_name_
+            << "' (oid=" << scan_plan.get_table_oid() << ") ---\n";
+
+  filter_exec.init();
   std::vector<storage::table::Tuple> batch;
   std::vector<RecordId> rids;
   size_t count = 0;
-  while (scan.next(&batch, &rids, 256)) {
+  while (filter_exec.next(&batch, &rids, 256)) {
     for (size_t i = 0; i < batch.size(); ++i) {
       const auto &t = batch[i];
-      const auto &schema = scan.get_output_schema();
+      const auto &schema = filter_exec.get_output_schema();
       const auto &columns = schema.get_columns();
 
       fmt::print("row {}: [", count++);

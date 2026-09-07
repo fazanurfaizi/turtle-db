@@ -115,7 +115,7 @@ struct fmt::formatter<
                            T>::value,
            char>> : fmt::formatter<std::string> {
   template <typename FormatCtx> auto format(const T &x, FormatCtx &ctx) const {
-    return fmt::formatter<std::string>::format(x.ToString(), ctx);
+    return fmt::formatter<std::string>::format(x.to_string(), ctx);
   }
 };
 
@@ -129,7 +129,7 @@ struct fmt::formatter<
   template <typename FormatCtx>
   auto format(const std::unique_ptr<T> &x, FormatCtx &ctx) const {
     if (x != nullptr) {
-      return fmt::formatter<std::string>::format(x->ToString(), ctx);
+      return fmt::formatter<std::string>::format(x->to_string(), ctx);
     }
     return fmt::formatter<std::string>::format("", ctx);
   }
@@ -145,7 +145,7 @@ struct fmt::formatter<
   template <typename FormatCtx>
   auto format(const std::shared_ptr<T> &x, FormatCtx &ctx) const {
     if (x != nullptr) {
-      return fmt::formatter<std::string>::format(x->ToString(), ctx);
+      return fmt::formatter<std::string>::format(x->to_string(), ctx);
     }
     return fmt::formatter<std::string>::format("", ctx);
   }
