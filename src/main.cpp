@@ -24,6 +24,7 @@
 #include "turtle/execution/expressions/column_value_expression.hpp"
 #include "turtle/execution/expressions/comparison_expression.hpp"
 #include "turtle/execution/expressions/constant_value_expression.hpp"
+#include "turtle/execution/expressions/logic_expression.hpp"
 #include "turtle/execution/plans/filter_plan.hpp"
 #include "turtle/execution/plans/insert_plan.hpp"
 #include "turtle/execution/plans/seq_scan_plan.hpp"
@@ -150,12 +151,22 @@ int main() {
     }
   }
 
-  auto pred = std::make_shared<execution::expressions::ComparisonExpression>(
+  auto cmp1 = std::make_shared<execution::expressions::ComparisonExpression>(
       std::make_shared<execution::expressions::ColumnValueExpression>(0, 6,
                                                                       cols[6]),
       std::make_shared<execution::expressions::ConstantValueExpression>(
           datatype::ValueFactory::get_boolean_value(false)),
       execution::expressions::ComparisonType::Equal);
+
+  auto cmp2 = std::make_shared<execution::expressions::ComparisonExpression>(
+      std::make_shared<execution::expressions::ColumnValueExpression>(0, 2,
+                                                                      cols[2]),
+      std::make_shared<execution::expressions::ConstantValueExpression>(
+          datatype::ValueFactory::get_small_int_value(20)),
+      execution::expressions::ComparisonType::GreaterThan);
+
+  auto pred = std::make_shared<execution::expressions::LogicExpression>(
+      cmp1, cmp2, execution::expressions::LogicType::And);
 
   // Build the scan plan + executor (the child that streams every row).
   execution::plans::SeqScanPlanNode scan_plan(schema_ref, table_info->oid_,
