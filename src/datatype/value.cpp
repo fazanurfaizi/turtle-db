@@ -67,7 +67,7 @@ Value::Value(DataType type, const char *data, uint32_t len, bool manage_data)
 }
 
 // VARCHAR (std::string)
-Value::Value(DataType type, std::string &data)
+Value::Value(DataType type, const std::string &data)
     : manage_data_(true), data_type_(type) {
   size_.len_ = data.length();
   value_.varlen_ = new char[size_.len_ + 1];
