@@ -45,6 +45,8 @@ public:
 
   auto get_storage_size(const Value &val) const -> uint32_t override;
 
+  auto get_data(const Value &val) const -> const char * override;
+
   auto is_coercable_from(DataType data_type) const -> bool override;
 };
 

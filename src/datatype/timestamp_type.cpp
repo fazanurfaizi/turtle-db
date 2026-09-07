@@ -4,6 +4,7 @@
 #include "turtle/datatype/value_factory.hpp"
 #include <cassert>
 #include <cstdint>
+#include <stdexcept>
 
 namespace turtle::datatype {
 
@@ -166,6 +167,12 @@ auto TimestampType::get_storage_size(const Value &val
                                      __attribute__((unused))) const
     -> uint32_t {
   return sizeof(int64_t);
+}
+
+auto TimestampType::get_data(const Value & /*val*/) const -> const char * {
+  // Inlined type: access via get_as<uint64_t>(), not raw bytes (VARCHAR only).
+  throw std::runtime_error(
+      "get_data() should not be called on inlined Timestamp types.");
 }
 
 auto TimestampType::is_coercable_from(DataType data_type) const -> bool {
