@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <iostream>
 #include <memory>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -12,7 +13,9 @@
 #include "turtle/catalog/table_info.hpp"
 #include "turtle/common/record_id.hpp"
 #include "turtle/datatype/data_types.hpp"
+#include "turtle/datatype/type.hpp"
 #include "turtle/datatype/value.hpp"
+#include "turtle/datatype/value_factory.hpp"
 #include "turtle/execution/executor_context.hpp"
 #include "turtle/execution/executors/insert_executor.hpp"
 #include "turtle/execution/executors/seq_scan_executor.hpp"
@@ -36,9 +39,14 @@ int main() {
 
   // Define the table schema: (id INTEGER, age INTEGER).
   std::vector<catalog::Column> cols;
-  cols.emplace_back("id", datatype::DataType::INTEGER);
+  cols.emplace_back("id", datatype::DataType::BIGINT);
   cols.emplace_back("name", datatype::DataType::VARCHAR);
-  cols.emplace_back("age", datatype::DataType::INTEGER);
+  cols.emplace_back("age", datatype::DataType::SMALLINT);
+  cols.emplace_back("weight", datatype::DataType::INTEGER);
+  cols.emplace_back("amount", datatype::DataType::DECIMAL);
+  cols.emplace_back("is_lived", datatype::DataType::TINYINT);
+  cols.emplace_back("is_active", datatype::DataType::BOOLEAN);
+  cols.emplace_back("date_of_birth", datatype::DataType::TIMESTAMP);
   auto schema_ref = std::make_shared<const catalog::ColumnSchema>(cols);
 
   // Register the table with the catalog; this creates its backing heap.
@@ -50,22 +58,50 @@ int main() {
   std::vector<std::vector<execution::expressions::AbstractExpressionRef>>
       values;
 
+  std::random_device rd;
+  std::mt19937 gen(rd());
+
+  std::uniform_int_distribution<int> dist(
+      0, static_cast<int>(datatype::CmpBool::CmpNull) - 1);
+
   for (int id = 1; id <= 1000; ++id) {
     std::vector<execution::expressions::AbstractExpressionRef> row;
     row.push_back(
         std::make_shared<execution::expressions::ConstantValueExpression>(
-            datatype::Value(datatype::DataType::INTEGER,
-                            static_cast<int32_t>(id))));
+            datatype::ValueFactory::get_big_int_value(id)));
 
     std::string name = "user_" + std::to_string(id);
     row.push_back(
         std::make_shared<execution::expressions::ConstantValueExpression>(
-            datatype::Value(datatype::DataType::VARCHAR, name)));
+            datatype::ValueFactory::get_varchar_value(name)));
 
     row.push_back(
         std::make_shared<execution::expressions::ConstantValueExpression>(
-            datatype::Value(datatype::DataType::INTEGER,
-                            static_cast<int32_t>(id * 7))));
+            datatype::ValueFactory::get_small_int_value(
+                static_cast<int16_t>(id + 1))));
+
+    row.push_back(
+        std::make_shared<execution::expressions::ConstantValueExpression>(
+            datatype::ValueFactory::get_integer_value(id * 7)));
+
+    row.push_back(
+        std::make_shared<execution::expressions::ConstantValueExpression>(
+            datatype::ValueFactory::get_decimal_value(id * 1000)));
+
+    row.push_back(
+        std::make_shared<execution::expressions::ConstantValueExpression>(
+            datatype::ValueFactory::get_tiny_int_value(1)));
+
+    row.push_back(
+        std::make_shared<execution::expressions::ConstantValueExpression>(
+            datatype::ValueFactory::get_boolean_value(
+                static_cast<datatype::CmpBool>(dist(gen)))));
+
+    row.push_back(
+        std::make_shared<execution::expressions::ConstantValueExpression>(
+            datatype::ValueFactory::cast_as_timestamp(
+                datatype::ValueFactory::get_varchar_value(
+                    "2026-09-07 12:30:00.000000+07"))));
 
     values.push_back(row);
   }

@@ -36,7 +36,7 @@ Tuple::Tuple(const catalog::ColumnSchema *schema,
       bitmap_ptr[i / 8] |= (1 << (i % 8));
     } else {
       // Serialize value
-      values[i].SerializeTo(data_ptr);
+      values[i].serialize_to(data_ptr);
       data_ptr += values[i].storage_size();
     }
   }
