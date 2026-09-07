@@ -1,5 +1,6 @@
 // -----------------------------------------------------------------------------
-// Tier 2 (Access & Structures) — turtle::storage::table::TableHeap + TableIterator
+// Tier 2 (Access & Structures) — turtle::storage::table::TableHeap +
+// TableIterator
 //
 // Scope: a SQL table as a singly-linked list of slotted pages. Exercises the
 // insert -> get_tuple round trip, automatic page growth when a page fills, and
@@ -100,7 +101,7 @@ TEST_F(TableHeapTest, InsertThenGetRoundTrips) {
 
   Tuple fetched;
   ASSERT_TRUE(heap.get_tuple(rid, &fetched));
-  EXPECT_EQ(fetched.value(schema_.get(), 0).GetAs<int32_t>(), 42);
+  EXPECT_EQ(fetched.value(schema_.get(), 0).get_as<int32_t>(), 42);
   EXPECT_EQ(fetched.value(schema_.get(), 1).to_string(), "alice");
 }
 
@@ -126,7 +127,8 @@ TEST_F(TableHeapTest, GrowsToNewPageWhenFull) {
   TableHeap heap(bpm_.get(), file_);
   const PageId first = heap.get_first_page_id();
 
-  // Big payloads (~2 KiB) so only ~2 fit per 4 KiB page; 6 inserts => >=2 pages.
+  // Big payloads (~2 KiB) so only ~2 fit per 4 KiB page; 6 inserts => >=2
+  // pages.
   const std::string big(2000, 'x');
   RecordId rid;
   for (int i = 0; i < 6; ++i) {
@@ -152,7 +154,7 @@ TEST_F(TableHeapTest, ScanVisitsEveryInsertedTupleAcrossPages) {
   for (auto it = heap.begin(); it != heap.end(); ++it) {
     const Tuple &t = it.get_tuple();
     if (count == 0) {
-      first_id = t.value(schema_.get(), 0).GetAs<int32_t>();
+      first_id = t.value(schema_.get(), 0).get_as<int32_t>();
     }
     ++count;
   }

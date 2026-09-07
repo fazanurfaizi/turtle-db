@@ -1,5 +1,6 @@
 // -----------------------------------------------------------------------------
-// Tier 2 (Access & Structures) — turtle::catalog (Catalog runtime table registry
+// Tier 2 (Access & Structures) — turtle::catalog (Catalog runtime table
+// registry
 // + Column / ColumnSchema)
 //
 // Scope: the metadata layer executors resolve tables through. Focus is the
@@ -91,7 +92,7 @@ TEST_F(CatalogTest, OidsAreAssignedMonotonically) {
 TEST_F(CatalogTest, CreateTableIsIdempotentByName) {
   TableInfo *first = catalog_->create_table("dup", people_schema());
   TableInfo *again = catalog_->create_table("dup", people_schema());
-  EXPECT_EQ(first, again);        // same handle
+  EXPECT_EQ(first, again); // same handle
   EXPECT_EQ(first->oid_, again->oid_);
 }
 
@@ -124,7 +125,7 @@ TEST_F(CatalogTest, TableHeapFromCatalogIsUsable) {
 
   storage::table::Tuple fetched;
   ASSERT_TRUE(info->table_->get_tuple(rid, &fetched));
-  EXPECT_EQ(fetched.value(&info->schema_, 0).GetAs<int32_t>(), 7);
+  EXPECT_EQ(fetched.value(&info->schema_, 0).get_as<int32_t>(), 7);
   EXPECT_EQ(fetched.value(&info->schema_, 1).to_string(), "carol");
 }
 

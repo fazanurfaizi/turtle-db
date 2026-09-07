@@ -34,7 +34,7 @@ TEST(IntegerValueTest, StoresAndReportsScalar) {
   Value v(DataType::INTEGER, static_cast<int32_t>(42));
   EXPECT_EQ(v.data_type(), DataType::INTEGER);
   EXPECT_FALSE(v.is_null());
-  EXPECT_EQ(v.GetAs<int32_t>(), 42);
+  EXPECT_EQ(v.get_as<int32_t>(), 42);
   EXPECT_EQ(v.storage_size(), sizeof(int32_t));
   EXPECT_EQ(v.to_string(), "42");
 }
@@ -48,10 +48,10 @@ TEST(IntegerValueTest, TypeOnlyCtorIsNull) {
 TEST(IntegerValueTest, SerializeDeserializeRoundTrip) {
   Value original(DataType::INTEGER, static_cast<int32_t>(-12345));
   std::array<char, sizeof(int32_t)> buf{};
-  original.SerializeTo(buf.data());
+  original.serialize_to(buf.data());
 
-  Value restored = Value::DeserializeFrom(buf.data(), DataType::INTEGER);
-  EXPECT_EQ(restored.GetAs<int32_t>(), -12345);
+  Value restored = Value::deserialize_from(buf.data(), DataType::INTEGER);
+  EXPECT_EQ(restored.get_as<int32_t>(), -12345);
   EXPECT_TRUE(original.compare_exactly_equals(restored));
 }
 
@@ -83,19 +83,19 @@ TEST(IntegerValueTest, ExactEqualsTreatsTwoNullsAsEqual) {
 
 // KNOWN DEFECT — pinned DISABLED (gtest "known bug" idiom).
 // The arithmetic kernels add_value/subtract_value/multiply_value/divide_value/
-// modulo_value in include/turtle/datatype/integer_parent_type.hpp (lines ~80-189)
-// have their ENTIRE bodies commented out. Each is declared `-> Value` but
-// contains no return statement, so IntegerType::add/subtract/... return an
+// modulo_value in include/turtle/datatype/integer_parent_type.hpp (lines
+// ~80-189) have their ENTIRE bodies commented out. Each is declared `-> Value`
+// but contains no return statement, so IntegerType::add/subtract/... return an
 // ill-formed Value (undefined behavior). Re-enable this test once the kernels
 // are implemented; the expected results are documented here as the spec.
 TEST(IntegerValueTest, DISABLED_ArithmeticProducesCorrectResults) {
   Value a(DataType::INTEGER, static_cast<int32_t>(7));
   Value b(DataType::INTEGER, static_cast<int32_t>(5));
-  EXPECT_EQ(a.add(b).GetAs<int32_t>(), 12);
-  EXPECT_EQ(a.subtract(b).GetAs<int32_t>(), 2);
-  EXPECT_EQ(a.multiply(b).GetAs<int32_t>(), 35);
-  EXPECT_EQ(a.divide(b).GetAs<int32_t>(), 1);
-  EXPECT_EQ(a.modulo(b).GetAs<int32_t>(), 2);
+  EXPECT_EQ(a.add(b).get_as<int32_t>(), 12);
+  EXPECT_EQ(a.subtract(b).get_as<int32_t>(), 2);
+  EXPECT_EQ(a.multiply(b).get_as<int32_t>(), 35);
+  EXPECT_EQ(a.divide(b).get_as<int32_t>(), 1);
+  EXPECT_EQ(a.modulo(b).get_as<int32_t>(), 2);
 }
 
 // The divide/modulo *guards* ARE implemented (they run before the unimplemented
@@ -110,14 +110,14 @@ TEST(IntegerValueTest, DivideByZeroThrows) {
 TEST(IntegerValueTest, MinMax) {
   Value a(DataType::INTEGER, static_cast<int32_t>(3));
   Value b(DataType::INTEGER, static_cast<int32_t>(8));
-  EXPECT_EQ(a.min(b).GetAs<int32_t>(), 3);
-  EXPECT_EQ(a.max(b).GetAs<int32_t>(), 8);
+  EXPECT_EQ(a.min(b).get_as<int32_t>(), 3);
+  EXPECT_EQ(a.max(b).get_as<int32_t>(), 8);
 }
 
 TEST(IntegerValueTest, CopyProducesEqualIndependentValue) {
   Value a(DataType::INTEGER, static_cast<int32_t>(99));
   Value c = a.copy();
-  EXPECT_EQ(c.GetAs<int32_t>(), 99);
+  EXPECT_EQ(c.get_as<int32_t>(), 99);
   EXPECT_TRUE(a.compare_exactly_equals(c));
 }
 
@@ -126,11 +126,11 @@ TEST(IntegerValueTest, CastToWiderTypes) {
 
   Value as_big = i.cast_as(DataType::BIGINT);
   EXPECT_EQ(as_big.data_type(), DataType::BIGINT);
-  EXPECT_EQ(as_big.GetAs<int64_t>(), 1000);
+  EXPECT_EQ(as_big.get_as<int64_t>(), 1000);
 
   Value as_dec = i.cast_as(DataType::DECIMAL);
   EXPECT_EQ(as_dec.data_type(), DataType::DECIMAL);
-  EXPECT_DOUBLE_EQ(as_dec.GetAs<double>(), 1000.0);
+  EXPECT_DOUBLE_EQ(as_dec.get_as<double>(), 1000.0);
 }
 
 // ============================ VARCHAR =======================================
@@ -171,10 +171,10 @@ TEST(VarcharValueTest, SerializeDeserializeRoundTrip) {
   Value original(DataType::VARCHAR, s);
 
   std::vector<char> buf(original.storage_size());
-  original.SerializeTo(buf.data());
+  original.serialize_to(buf.data());
 
   // The decoded VARCHAR is a non-owning view into buf, so buf must outlive it.
-  Value restored = Value::DeserializeFrom(buf.data(), DataType::VARCHAR);
+  Value restored = Value::deserialize_from(buf.data(), DataType::VARCHAR);
   EXPECT_EQ(restored.to_string(), s);
   EXPECT_EQ(restored.compare_equals(original), CmpBool::CmpTrue);
 }
@@ -217,7 +217,8 @@ TEST(VarcharValueTest, ArithmeticIsUnsupported) {
 // ======================= Value traits & column() ============================
 
 TEST(ValueTraitsTest, CheckIntegerClassifiesFamilies) {
-  EXPECT_TRUE(Value(DataType::INTEGER, static_cast<int32_t>(0)).check_integer());
+  EXPECT_TRUE(
+      Value(DataType::INTEGER, static_cast<int32_t>(0)).check_integer());
   EXPECT_TRUE(Value(DataType::BIGINT, static_cast<int64_t>(0)).check_integer());
   std::string s = "no";
   EXPECT_FALSE(Value(DataType::VARCHAR, s).check_integer());

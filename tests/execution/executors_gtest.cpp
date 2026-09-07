@@ -64,7 +64,7 @@ public:
   MOCK_METHOD(void, init, (), (override));
   MOCK_METHOD(bool, next,
               (std::vector<Tuple> * tuple_batch,
-               std::vector<RecordId> * rid_batch, size_t batch_size),
+               std::vector<RecordId> *rid_batch, size_t batch_size),
               (override));
 
   auto get_output_schema() const -> const ColumnSchema & override {
@@ -85,7 +85,8 @@ protected:
     disk_ = std::make_unique<storage::disk::DiskManager>();
     bpm_ = std::make_unique<buffer::BufferPoolManager>(32, disk_.get());
     catalog_ = std::make_unique<catalog::Catalog>(
-        bpm_.get(), disk_.get(), (dir_ / "catalog.cat").string(), dir_.string());
+        bpm_.get(), disk_.get(), (dir_ / "catalog.cat").string(),
+        dir_.string());
     ctx_ = std::make_unique<ExecutorContext>(catalog_.get(), bpm_.get(), false);
 
     // people(id INTEGER, name VARCHAR)
@@ -164,13 +165,13 @@ TEST_F(ExecutorTest, ValuesExecutorEmitsAllRowsRespectingBatchSize) {
   // batch_size 2 -> first call yields 2 rows.
   ASSERT_TRUE(exec.next(&batch, &rids, 2));
   EXPECT_EQ(batch.size(), 2u);
-  EXPECT_EQ(batch[0].value(&exec.get_output_schema(), 0).GetAs<int32_t>(), 1);
+  EXPECT_EQ(batch[0].value(&exec.get_output_schema(), 0).get_as<int32_t>(), 1);
   EXPECT_EQ(batch[1].value(&exec.get_output_schema(), 1).to_string(), "b");
 
   // second call yields the remaining 1 row.
   ASSERT_TRUE(exec.next(&batch, &rids, 2));
   EXPECT_EQ(batch.size(), 1u);
-  EXPECT_EQ(batch[0].value(&exec.get_output_schema(), 0).GetAs<int32_t>(), 3);
+  EXPECT_EQ(batch[0].value(&exec.get_output_schema(), 0).get_as<int32_t>(), 3);
 
   // third call is exhausted.
   EXPECT_FALSE(exec.next(&batch, &rids, 2));
@@ -182,9 +183,8 @@ TEST_F(ExecutorTest, SeqScanStreamsEveryStoredTuple) {
   constexpr int kRows = 120;
   for (int i = 0; i < kRows; ++i) {
     RecordId rid;
-    ASSERT_TRUE(
-        people_->table_->insert_tuple(people_row(i, "u" + std::to_string(i)),
-                                      &rid));
+    ASSERT_TRUE(people_->table_->insert_tuple(
+        people_row(i, "u" + std::to_string(i)), &rid));
   }
 
   plans::SeqScanPlanNode plan(people_schema_, people_->oid_, "people");
@@ -226,8 +226,8 @@ TEST_F(ExecutorTest, InsertPullsChildBatchAndReportsRowCount) {
   using ::testing::Invoke;
   using ::testing::Return;
 
-  auto child = std::make_unique<MockAbstractExecutor>(ctx_.get(),
-                                                      &people_->schema_);
+  auto child =
+      std::make_unique<MockAbstractExecutor>(ctx_.get(), &people_->schema_);
   MockAbstractExecutor *child_raw = child.get();
 
   // Child is initialized exactly once, then yields one batch of 3 rows and
@@ -249,8 +249,7 @@ TEST_F(ExecutorTest, InsertPullsChildBatchAndReportsRowCount) {
   plans::InsertPlanNode plan(
       count_schema_,
       std::make_shared<plans::ValuesPlanNode>(
-          people_schema_,
-          std::vector<std::vector<AbstractExpressionRef>>{}),
+          people_schema_, std::vector<std::vector<AbstractExpressionRef>>{}),
       people_->oid_);
 
   executors::InsertExecutor insert(ctx_.get(), &plan, std::move(child));
@@ -260,7 +259,7 @@ TEST_F(ExecutorTest, InsertPullsChildBatchAndReportsRowCount) {
   std::vector<RecordId> out_rids;
   ASSERT_TRUE(insert.next(&out, &out_rids, 256));
   ASSERT_EQ(out.size(), 1u);
-  EXPECT_EQ(out[0].value(&insert.get_output_schema(), 0).GetAs<int32_t>(), 3);
+  EXPECT_EQ(out[0].value(&insert.get_output_schema(), 0).get_as<int32_t>(), 3);
 
   // Insert must be a single-shot count emitter: second call returns false.
   EXPECT_FALSE(insert.next(&out, &out_rids, 256));
@@ -284,8 +283,8 @@ TEST_F(ExecutorTest, ValuesToInsertPipelineInsertsAndCounts) {
 
   auto values_plan =
       std::make_shared<plans::ValuesPlanNode>(people_schema_, values);
-  auto values_exec =
-      std::make_unique<executors::ValuesExecutor>(ctx_.get(), values_plan.get());
+  auto values_exec = std::make_unique<executors::ValuesExecutor>(
+      ctx_.get(), values_plan.get());
 
   plans::InsertPlanNode plan(count_schema_, values_plan, people_->oid_);
   executors::InsertExecutor insert(ctx_.get(), &plan, std::move(values_exec));
@@ -295,7 +294,7 @@ TEST_F(ExecutorTest, ValuesToInsertPipelineInsertsAndCounts) {
   std::vector<RecordId> out_rids;
   ASSERT_TRUE(insert.next(&out, &out_rids, 256));
   ASSERT_EQ(out.size(), 1u);
-  EXPECT_EQ(out[0].value(&insert.get_output_schema(), 0).GetAs<int32_t>(), 10);
+  EXPECT_EQ(out[0].value(&insert.get_output_schema(), 0).get_as<int32_t>(), 10);
 
   EXPECT_EQ(count_table_rows(), 10);
 }

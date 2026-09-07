@@ -63,9 +63,9 @@ TEST(TupleTest, ReadsBackEveryColumn) {
   ColumnSchema schema = make_schema();
   Tuple t = make_row(schema, 7, "turtle", 33);
 
-  EXPECT_EQ(t.value(&schema, 0).GetAs<int32_t>(), 7);
+  EXPECT_EQ(t.value(&schema, 0).get_as<int32_t>(), 7);
   EXPECT_EQ(t.value(&schema, 1).to_string(), "turtle");
-  EXPECT_EQ(t.value(&schema, 2).GetAs<int32_t>(), 33);
+  EXPECT_EQ(t.value(&schema, 2).get_as<int32_t>(), 33);
 }
 
 // ---- serialize / deserialize round trip ------------------------------------
@@ -81,9 +81,9 @@ TEST(TupleTest, SerializeDeserializeRoundTrip) {
   restored.deserialize_from(buf.data(), original.storage_size());
 
   EXPECT_EQ(restored.storage_size(), original.storage_size());
-  EXPECT_EQ(restored.value(&schema, 0).GetAs<int32_t>(), 100);
+  EXPECT_EQ(restored.value(&schema, 0).get_as<int32_t>(), 100);
   EXPECT_EQ(restored.value(&schema, 1).to_string(), "roundtrip");
-  EXPECT_EQ(restored.value(&schema, 2).GetAs<int32_t>(), 9);
+  EXPECT_EQ(restored.value(&schema, 2).get_as<int32_t>(), 9);
 }
 
 // ---- value semantics -------------------------------------------------------
@@ -93,7 +93,7 @@ TEST(TupleTest, CopyConstructorDeepCopies) {
   Tuple a = make_row(schema, 5, "orig", 1);
   Tuple b = a; // copy ctor
 
-  EXPECT_NE(a.data(), b.data());              // independent buffers
+  EXPECT_NE(a.data(), b.data()); // independent buffers
   EXPECT_EQ(b.value(&schema, 1).to_string(), "orig");
   EXPECT_EQ(a.storage_size(), b.storage_size());
 }
@@ -105,7 +105,7 @@ TEST(TupleTest, CopyAssignmentDeepCopies) {
   b = a; // copy assignment releases b's old buffer, clones a's
 
   EXPECT_NE(a.data(), b.data());
-  EXPECT_EQ(b.value(&schema, 0).GetAs<int32_t>(), 5);
+  EXPECT_EQ(b.value(&schema, 0).get_as<int32_t>(), 5);
   EXPECT_EQ(b.value(&schema, 1).to_string(), "src");
 }
 
@@ -146,12 +146,12 @@ TEST(TupleTest, DISABLED_ColumnAfterNullIsReadableWhenBitmapAware) {
   ColumnSchema schema(std::move(cols));
 
   std::vector<Value> vals;
-  vals.emplace_back(DataType::INTEGER);                    // a = NULL (0 bytes)
+  vals.emplace_back(DataType::INTEGER); // a = NULL (0 bytes)
   vals.emplace_back(DataType::INTEGER, static_cast<int32_t>(42)); // b = 42
   Tuple t(&schema, std::move(vals));
 
   EXPECT_TRUE(t.value(&schema, 0).is_null());
-  EXPECT_EQ(t.value(&schema, 1).GetAs<int32_t>(), 42);
+  EXPECT_EQ(t.value(&schema, 1).get_as<int32_t>(), 42);
 }
 
 } // namespace

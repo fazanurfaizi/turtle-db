@@ -49,19 +49,21 @@ Tuple two_col_row(const ColumnSchema &schema, int32_t a, const std::string &b) {
 // ---- ConstantValueExpression ----------------------------------------------
 
 TEST(ConstantValueExpressionTest, EvaluateReturnsTheConstantIgnoringTuple) {
-  ConstantValueExpression expr(Value(DataType::INTEGER, static_cast<int32_t>(7)));
+  ConstantValueExpression expr(
+      Value(DataType::INTEGER, static_cast<int32_t>(7)));
   ColumnSchema schema = two_col_schema();
 
   // A constant ignores the tuple entirely (nullptr is a valid input here).
   Value v = expr.evaluate(nullptr, schema);
-  EXPECT_EQ(v.GetAs<int32_t>(), 7);
+  EXPECT_EQ(v.get_as<int32_t>(), 7);
 }
 
 TEST(ConstantValueExpressionTest, EvaluateJoinAlsoReturnsTheConstant) {
-  ConstantValueExpression expr(Value(DataType::INTEGER, static_cast<int32_t>(9)));
+  ConstantValueExpression expr(
+      Value(DataType::INTEGER, static_cast<int32_t>(9)));
   ColumnSchema schema = two_col_schema();
   Value v = expr.evaluate_join(nullptr, schema, nullptr, schema);
-  EXPECT_EQ(v.GetAs<int32_t>(), 9);
+  EXPECT_EQ(v.get_as<int32_t>(), 9);
 }
 
 TEST(ConstantValueExpressionTest, ReturnTypeMatchesConstantsDataType) {
@@ -74,7 +76,8 @@ TEST(ConstantValueExpressionTest, ReturnTypeMatchesConstantsDataType) {
 }
 
 TEST(ConstantValueExpressionTest, ToStringRendersTheValue) {
-  ConstantValueExpression expr(Value(DataType::INTEGER, static_cast<int32_t>(42)));
+  ConstantValueExpression expr(
+      Value(DataType::INTEGER, static_cast<int32_t>(42)));
   EXPECT_EQ(expr.to_string(), "42");
 }
 
@@ -87,7 +90,7 @@ TEST(ColumnValueExpressionTest, ProjectsRequestedColumnFromTuple) {
   ColumnValueExpression col0(0, 0, schema.get_columns()[0]);
   ColumnValueExpression col1(0, 1, schema.get_columns()[1]);
 
-  EXPECT_EQ(col0.evaluate(&row, schema).GetAs<int32_t>(), 5);
+  EXPECT_EQ(col0.evaluate(&row, schema).get_as<int32_t>(), 5);
   EXPECT_EQ(col1.evaluate(&row, schema).to_string(), "hi");
 }
 
@@ -108,10 +111,12 @@ TEST(ColumnValueExpressionTest, EvaluateJoinPicksSideByTupleIndex) {
   ColumnValueExpression from_left(0, 0, schema.get_columns()[0]);
   ColumnValueExpression from_right(1, 0, schema.get_columns()[0]);
 
-  EXPECT_EQ(from_left.evaluate_join(&left, schema, &right, schema).GetAs<int32_t>(),
-            100);
-  EXPECT_EQ(from_right.evaluate_join(&left, schema, &right, schema).GetAs<int32_t>(),
-            200);
+  EXPECT_EQ(
+      from_left.evaluate_join(&left, schema, &right, schema).get_as<int32_t>(),
+      100);
+  EXPECT_EQ(
+      from_right.evaluate_join(&left, schema, &right, schema).get_as<int32_t>(),
+      200);
 }
 
 } // namespace
