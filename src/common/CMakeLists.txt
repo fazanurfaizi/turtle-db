@@ -3,6 +3,7 @@ set(COMMON_LIBRARY_NAME "common")
 add_library(${COMMON_LIBRARY_NAME} STATIC)
 
 target_sources(${COMMON_LIBRARY_NAME} PRIVATE
+  exceptions.cpp
   util/binary_serializer.cpp
 )
 
