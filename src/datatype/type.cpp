@@ -46,7 +46,27 @@ auto Type::get_type_size(DataType data_type) -> uint64_t {
 auto Type::is_coercable_from(DataType /*data_type*/) const -> bool {
   return false;
 }
-auto Type::data_type_to_string(DataType /*data_type*/) -> std::string {
+auto Type::data_type_to_string(DataType data_type) -> std::string {
+  switch (data_type) {
+  case DataType::INVALID:
+    return "INVALID";
+  case DataType::BOOLEAN:
+    return "BOOLEAN";
+  case DataType::INTEGER:
+    return "INTEGER";
+  case DataType::TINYINT:
+    return "TINYINT";
+  case DataType::SMALLINT:
+    return "SMALLINT";
+  case DataType::BIGINT:
+    return "BIGINT";
+  case DataType::DECIMAL:
+    return "DECIMAL";
+  case DataType::VARCHAR:
+    return "VARCHAR";
+  case DataType::TIMESTAMP:
+    return "TIMESTAMP";
+  }
   return "UNKNOWN";
 }
 auto Type::get_min_value(DataType /*data_type*/) -> Value { return Value(); }

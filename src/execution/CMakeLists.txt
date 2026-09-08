@@ -5,6 +5,7 @@ add_library(${EXECUTION_LIBRARY_NAME} STATIC)
 target_sources(${EXECUTION_LIBRARY_NAME} PRIVATE
   executors/seq_scan_executor.cpp
   executors/insert_executor.cpp
+  executors/projection_executor.cpp
   executors/value_executor.cpp
   executors/filter_executor.cpp
 )
