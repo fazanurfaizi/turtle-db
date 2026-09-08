@@ -155,18 +155,18 @@ int main() {
       std::make_shared<execution::expressions::ColumnValueExpression>(0, 6,
                                                                       cols[6]),
       std::make_shared<execution::expressions::ConstantValueExpression>(
-          datatype::ValueFactory::get_boolean_value(false)),
+          datatype::ValueFactory::get_boolean_value(true)),
       execution::expressions::ComparisonType::Equal);
 
   auto cmp2 = std::make_shared<execution::expressions::ComparisonExpression>(
       std::make_shared<execution::expressions::ColumnValueExpression>(0, 2,
-                                                                      cols[2]),
+                                                                      cols[5]),
       std::make_shared<execution::expressions::ConstantValueExpression>(
-          datatype::ValueFactory::get_small_int_value(20)),
-      execution::expressions::ComparisonType::GreaterThan);
+          datatype::ValueFactory::get_tiny_int_value(1)),
+      execution::expressions::ComparisonType::Equal);
 
   auto pred = std::make_shared<execution::expressions::LogicExpression>(
-      cmp1, cmp2, execution::expressions::LogicType::And);
+      cmp1, cmp2, execution::expressions::LogicType::Or);
 
   // Build the scan plan + executor (the child that streams every row).
   execution::plans::SeqScanPlanNode scan_plan(schema_ref, table_info->oid_,

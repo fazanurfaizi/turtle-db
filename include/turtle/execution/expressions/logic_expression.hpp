@@ -4,6 +4,7 @@
 #include "turtle/catalog/column.hpp"
 #include "turtle/catalog/column_schema.hpp"
 #include "turtle/common/exceptions.hpp"
+#include "turtle/common/macros.hpp"
 #include "turtle/datatype/data_types.hpp"
 #include "turtle/datatype/type.hpp"
 #include "turtle/datatype/value.hpp"
@@ -127,15 +128,16 @@ private:
       }
       return datatype::CmpBool::CmpNull;
     case LogicType::Or:
-      if (l == datatype::CmpBool::CmpFalse ||
-          r == datatype::CmpBool::CmpFalse) {
-        return datatype::CmpBool::CmpFalse;
-      }
       if (l == datatype::CmpBool::CmpTrue || r == datatype::CmpBool::CmpTrue) {
         return datatype::CmpBool::CmpTrue;
       }
+      if (l == datatype::CmpBool::CmpFalse &&
+          r == datatype::CmpBool::CmpFalse) {
+        return datatype::CmpBool::CmpFalse;
+      }
       return datatype::CmpBool::CmpNull;
     }
+    UNREACHABLE("unknown logic type");
   }
 };
 
