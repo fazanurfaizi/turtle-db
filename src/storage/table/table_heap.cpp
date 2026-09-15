@@ -2,8 +2,10 @@
 
 #include "turtle/buffer/buffer_pool_manager.hpp"
 #include "turtle/common/config.hpp"
+#include "turtle/common/macros.hpp"
 #include "turtle/storage/page/page.hpp"
 #include "turtle/storage/page/slotted_page.hpp"
+#include "turtle/storage/page/write_page_guard.hpp"
 #include "turtle/storage/table/table_heap.hpp"
 #include "turtle/storage/table/table_iterator.hpp"
 
@@ -23,15 +25,12 @@ TableHeap::TableHeap(buffer::BufferPoolManager *bpm, FileId file_id)
   }
 
   // Initialize the page as a Slotted Page
-  page::SlottedPage slotted_page(first_page);
-  slotted_page.init(first_page_id);
+  page::WritePageGuard first_page_guard(this->bpm_, first_page);
+  first_page_guard.as_mut<page::SlottedPage>()->init(first_page_id);
 
   // Keep track of first and last pages
   this->first_page_id_ = first_page_id;
   this->last_page_id_ = first_page_id;
-
-  // Unpin the page
-  this->bpm_->unpin_page(this->file_id_, first_page_id, true);
 }
 
 // Opening an existing table from disk
@@ -44,14 +43,14 @@ TableHeap::TableHeap(buffer::BufferPoolManager *bpm, FileId file_id,
 
   do {
     // Fetch the current page
-    page::Page *page = this->bpm_->fetch_page(this->file_id_, current_page_id);
-    page::SlottedPage slotted_page(page);
+    auto read_page = this->bpm_->read_page(this->file_id_, current_page_id);
+    if (!read_page.has_value()) {
+      return;
+    }
+    const auto *slotted_page = read_page->as<page::SlottedPage>();
 
     // Find out what the next page is
-    next_page_id = slotted_page.get_next_page_id();
-
-    // Unpin because we are just reading, not modifying
-    this->bpm_->unpin_page(this->file_id_, current_page_id, false);
+    next_page_id = slotted_page->get_next_page_id();
 
     if (next_page_id != INVALID_PAGE_ID) {
       current_page_id = next_page_id;
@@ -63,57 +62,52 @@ TableHeap::TableHeap(buffer::BufferPoolManager *bpm, FileId file_id,
 
 bool TableHeap::insert_tuple(const Tuple &tuple, RecordId *rid) {
   // Fetch the last page of the table where we usually have free space.
-  page::Page *page = this->bpm_->fetch_page(this->file_id_, this->last_page_id_);
-  page::SlottedPage slotted_page(page);
-
-  // Try to insert the tuple into this page.
-  if (slotted_page.insert_tuple(tuple, rid)) {
-    this->bpm_->unpin_page(this->file_id_, this->last_page_id_, true);
-    return true;
-  }
-
-  // If it failed, the page is full. Create a new page.
-  PageId new_page_id;
-  page::Page *new_page = this->bpm_->new_page(this->file_id_, &new_page_id);
-  if (new_page == nullptr) {
-    // BPM is completely full and nothing can be evicted.
-    this->bpm_->unpin_page(this->file_id_, this->last_page_id_, false);
+  auto write_page = this->bpm_->write_page(this->file_id_, this->last_page_id_);
+  if (!write_page.has_value()) {
     return false;
   }
 
-  // Initialize the new page
-  page::SlottedPage new_slotted_page(new_page);
-  new_slotted_page.init(new_page_id);
+  while (true) {
+    auto *slotted_page(write_page->as_mut<page::SlottedPage>());
 
-  // Link the old last page to this new page
-  slotted_page.set_next_page_id(new_page_id);
+    // Try to insert the tuple into this page.
+    if (slotted_page->insert_tuple(tuple, rid)) {
+      return true;
+    }
 
-  this->bpm_->unpin_page(this->file_id_, this->last_page_id_, true);
+    TURTLE_ENSURE(slotted_page->tuple_count() != 0,
+                  "Tuple too large to fit in a single page");
 
-  // Insert the tuple into the new page
-  bool success = new_slotted_page.insert_tuple(tuple, rid);
+    // If it failed, the page is full. Create a new page.
+    PageId new_page_id;
+    page::Page *new_page = this->bpm_->new_page(this->file_id_, &new_page_id);
+    if (new_page == nullptr) {
+      // BPM is completely full and nothing can be evicted.
+      return false;
+    }
+    slotted_page->set_next_page_id(new_page_id);
 
-  // Update TableHeap's tracker
-  this->last_page_id_ = new_page_id;
+    page::WritePageGuard next_page(this->bpm_, new_page);
+    next_page.as_mut<page::SlottedPage>()->init(new_page_id);
+    // Update TableHeap's tracker
+    this->last_page_id_ = new_page_id;
 
-  // Unpin the new page and mark dirty
-  this->bpm_->unpin_page(this->file_id_, new_page_id, true);
-
-  return success;
+    // Unpin the new page and mark dirty
+    write_page = std::move(next_page);
+  }
 }
 
 bool TableHeap::get_tuple(const RecordId &rid, Tuple *tuple) {
   // Fetch specific page containing the tuple
-  page::Page *page = this->bpm_->fetch_page(this->file_id_, rid.page_id);
-  if (page == nullptr)
+  auto read_page = this->bpm_->read_page(this->file_id_, rid.page_id);
+  if (!read_page.has_value()) {
     return false;
+  }
 
-  page::SlottedPage slotted_page(page);
-
+  const auto *slotted_page = read_page->as<page::SlottedPage>();
   // Read the tuple data into the provided pointer
-  slotted_page.tuple(rid, tuple);
+  slotted_page->tuple(rid, tuple);
 
-  this->bpm_->unpin_page(this->file_id_, rid.page_id, false);
   return true;
 }
 

@@ -36,7 +36,7 @@ namespace turtle {
   auto operator=(cname &&)->cname & = delete; /* NOLINT */
 
 #define DISALLOW_COPY_AND_MOVE(cname)                                          \
-  DISALLOW_COPY(cname);                                                        \
-  DISALLOW_MOVE(cname);
+  DISALLOW_COPY(cname)                                                         \
+  DISALLOW_MOVE(cname)
 
 } // namespace turtle

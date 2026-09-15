@@ -4,6 +4,7 @@
 #include <cstring>
 
 #include "turtle/common/config.hpp"
+#include "turtle/common/macros.hpp"
 #include "turtle/common/record_id.hpp"
 #include "turtle/storage/page/page.hpp"
 
@@ -13,15 +14,14 @@ class Tuple;
 
 class SlottedPage {
 public:
-  SlottedPage() = default;
-  explicit SlottedPage(Page *page);
-  ~SlottedPage();
+  SlottedPage() = delete;
+  DISALLOW_COPY_AND_MOVE(SlottedPage)
 
   void init(PageId page_id);
 
   template <typename T> bool insert_tuple(const T &tuple, RecordId *record_id);
 
-  template <typename T> void tuple(const RecordId &record_id, T *tuple);
+  template <typename T> void tuple(const RecordId &record_id, T *tuple) const;
 
   void delete_tuple(const RecordId &record_id);
 
@@ -56,9 +56,23 @@ private:
     uint32_t length_;
   };
 
-  Header *header() const;
-  Slot *slots() const;
-  char *data() const;
+  Header *header() { return reinterpret_cast<Header *>(this); };
+  const Header *header() const {
+    return reinterpret_cast<const Header *>(this);
+  }
+
+  Slot *slots() {
+    return reinterpret_cast<Slot *>(reinterpret_cast<char *>(this) +
+                                    sizeof(Header));
+  };
+  const Slot *slots() const {
+    return reinterpret_cast<const Slot *>(reinterpret_cast<const char *>(this) +
+                                          sizeof(Header));
+  };
+
+  char *data() { return reinterpret_cast<char *>(this); };
+  const char *data() const { return reinterpret_cast<const char *>(this); }
+
   void validate_record_id(const RecordId &record_id) const;
 
   Page *page_;
@@ -102,10 +116,10 @@ bool SlottedPage::insert_tuple(const T &tuple, RecordId *record_id) {
 }
 
 template <typename T>
-void SlottedPage::tuple(const RecordId &record_id, T *tuple) {
+void SlottedPage::tuple(const RecordId &record_id, T *tuple) const {
   this->validate_record_id(record_id);
-  Slot *slots = this->slots();
-  Slot &slot = slots[record_id.slot_num];
+  const Slot *slots = this->slots();
+  const Slot &slot = slots[record_id.slot_num];
 
   if (slot.length_ == 0) {
     throw std::runtime_error("Slot is empty (deleted tuple)");

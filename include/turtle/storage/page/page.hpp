@@ -1,17 +1,26 @@
 #pragma once
 
 #include <cstring>
+#include <shared_mutex>
 
 #include "turtle/buffer/buffer_pool_manager.hpp"
 #include "turtle/common/config.hpp"
 
 namespace turtle::storage::page {
 
+class ReadPageGuard;
+class WritePageGuard;
+
 class Page {
+  friend class ReadPageGuard;
+  friend class WritePageGuard;
+
 public:
   Page() = default;
 
-  char *data() { return this->data_; }
+  auto data() const -> const char * { return this->data_; }
+  auto data_mut() -> char * { return this->data_; }
+
   PageId page_id() const { return this->page_id_; }
   FileId file_id() const { return this->file_id_; }
   int pin_count() const { return this->pin_count_; }
@@ -21,6 +30,8 @@ public:
 
 private:
   friend class turtle::buffer::BufferPoolManager;
+
+  std::shared_ptr<std::shared_mutex> rw_latch_;
 
   char *data_{nullptr};
 

@@ -1,9 +1,16 @@
 #include <cstddef>
+#include <fmt/base.h>
+#include <memory>
 #include <mutex>
+#include <optional>
+#include <shared_mutex>
 
+#include "turtle/buffer/arc_replacer.hpp"
 #include "turtle/buffer/buffer_pool_manager.hpp"
 #include "turtle/common/config.hpp"
 #include "turtle/storage/page/page.hpp"
+#include "turtle/storage/page/read_page_guard.hpp"
+#include "turtle/storage/page/write_page_guard.hpp"
 
 namespace turtle::buffer {
 
@@ -19,7 +26,8 @@ BufferPoolManager::BufferPoolManager(size_t pool_size,
 
   for (FrameId i = 0; i < static_cast<FrameId>(this->pool_size_); ++i) {
     this->pages_[i].data_ = this->frame_data_ + i * PAGE_SIZE;
-    this->free_list_.push_back(i);
+    this->pages_[i].rw_latch_ = std::make_shared<std::shared_mutex>();
+    this->free_frames_.push_back(i);
   }
 }
 
@@ -29,11 +37,132 @@ BufferPoolManager::~BufferPoolManager() {
   delete[] this->pages_;
 }
 
+/**
+ * @brief Acquires an optional write-locked guard over a page of data. The user
+ * can specify an `AccessType` if needed.
+ *
+ * If it is not possible to bring the page of data into memory, this function
+ * will return a `std::nullopt`.
+ *
+ * Page data can _only_ be accessed via page guards. Users of this
+ * `BufferPoolManager` are expected to acquire either a `ReadPageGuard` or a
+ * `WritePageGuard` depending on the mode in which they would like to access the
+ * data, which ensures that any access of data is thread-safe.
+ *
+ * There can only be 1 `WritePageGuard` reading/writing a page at a time. This
+ * allows data access to be both immutable and mutable, meaning the thread that
+ * owns the `WritePageGuard` is allowed to manipulate the page's data however
+ * they want. If a user wants to have multiple threads reading the page at the
+ * same time, they must acquire a `ReadPageGuard` with `CheckedReadPage`
+ * instead.
+ *
+ * ### Implementation
+ *
+ * There are three main cases that you will have to implement. The first two are
+ * relatively simple: one is when there is plenty of available memory, and the
+ * other is when we don't actually need to perform any additional I/O. Think
+ * about what exactly these two cases entail.
+ *
+ * The third case is the trickiest, and it is when we do not have any _easily_
+ * available memory at our disposal. The buffer pool is tasked with finding
+ * memory that it can use to bring in a page of memory, using the replacement
+ * algorithm you implemented previously to find candidate frames for eviction.
+ *
+ * Once the buffer pool has identified a frame for eviction, several I/O
+ * operations may be necessary to bring in the page of data we want into the
+ * frame.
+ *
+ * There is likely going to be a lot of shared code with `CheckedReadPage`, so
+ * you may find creating helper functions useful.
+ *
+ * These two functions are the crux of this project, so we won't give you more
+ * hints than this. Good luck!
+ *
+ * TODO(P1): Add implementation.
+ *
+ * @param file_id The ID of the file we want to write to.
+ * @param page_id The ID of the page we want to write to.
+ * @param access_type The type of page access.
+ * @return std::optional<WritePageGuard> An optional latch guard where if there
+ * are no more free frames (out of memory) returns `std::nullopt`; otherwise,
+ * returns a `WritePageGuard` ensuring exclusive and mutable access to a page's
+ * data.
+ */
+auto BufferPoolManager::write_page(FileId file_id, PageId page_id,
+                                   [[maybe_unused]] AccessType access_type)
+    -> std::optional<storage::page::WritePageGuard> {
+  storage::page::Page *page = this->fetch_page(file_id, page_id);
+  if (page != nullptr) {
+    return storage::page::WritePageGuard(this, page);
+  }
+
+  return std::nullopt;
+}
+
+/**
+ * @brief Acquires an optional write-locked guard over a page of data. The
+ * user can specify an `AccessType` if needed.
+ *
+ * If it is not possible to bring the page of data into memory, this function
+ * will return a `std::nullopt`.
+ *
+ * Page data can _only_ be accessed via page guards. Users of this
+ * `BufferPoolManager` are expected to acquire either a `ReadPageGuard` or a
+ * `WritePageGuard` depending on the mode in which they would like to access
+ * the data, which ensures that any access of data is thread-safe.
+ *
+ * There can only be 1 `WritePageGuard` reading/writing a page at a time. This
+ * allows data access to be both immutable and mutable, meaning the thread
+ * that owns the `WritePageGuard` is allowed to manipulate the page's data
+ * however they want. If a user wants to have multiple threads reading the
+ * page at the same time, they must acquire a `ReadPageGuard` with
+ * `CheckedReadPage` instead.
+ *
+ * ### Implementation
+ *
+ * There are three main cases that you will have to implement. The first two
+ * are relatively simple: one is when there is plenty of available memory, and
+ * the other is when we don't actually need to perform any additional I/O.
+ * Think about what exactly these two cases entail.
+ *
+ * The third case is the trickiest, and it is when we do not have any _easily_
+ * available memory at our disposal. The buffer pool is tasked with finding
+ * memory that it can use to bring in a page of memory, using the replacement
+ * algorithm you implemented previously to find candidate frames for eviction.
+ *
+ * Once the buffer pool has identified a frame for eviction, several I/O
+ * operations may be necessary to bring in the page of data we want into the
+ * frame.
+ *
+ * There is likely going to be a lot of shared code with `CheckedReadPage`, so
+ * you may find creating helper functions useful.
+ *
+ * These two functions are the crux of this project, so we won't give you more
+ * hints than this. Good luck!
+ *
+ * TODO(P1): Add implementation.
+ *
+ * @param page_id The ID of the page we want to write to.
+ * @param access_type The type of page access.
+ * @return std::optional<WritePageGuard> An optional latch guard where if
+ * there are no more free frames (out of memory) returns `std::nullopt`;
+ * otherwise, returns a `WritePageGuard` ensuring exclusive and mutable access
+ * to a page's data.
+ */
+auto BufferPoolManager::read_page(FileId file_id, PageId page_id,
+                                  [[maybe_unused]] AccessType access_type)
+    -> std::optional<storage::page::ReadPageGuard> {
+  storage::page::Page *page = this->fetch_page(file_id, page_id);
+  if (page != nullptr) {
+    return storage::page::ReadPageGuard(this, page);
+  }
+
+  return std::nullopt;
+}
+
 storage::page::Page *BufferPoolManager::fetch_page(FileId file_id,
                                                    PageId page_id) {
-  // std::lock_guard<std::mutex> guard(this->latch_);
   std::scoped_lock<std::mutex> guard(*this->bpm_latch_);
-  // this->bpm_latch_->lock();
 
   PageKey key{file_id, page_id};
 
@@ -43,7 +172,6 @@ storage::page::Page *BufferPoolManager::fetch_page(FileId file_id,
     storage::page::Page &page = this->pages_[frame_id];
 
     page.pin_count_++;
-    // this->replacer_.pin(frame_id);
     this->replacer_.record_access(frame_id, page_id);
     this->replacer_.set_evictable(frame_id, false);
 
@@ -52,9 +180,9 @@ storage::page::Page *BufferPoolManager::fetch_page(FileId file_id,
 
   // Page not in buffer pool, find a frame
   FrameId frame_id;
-  if (!this->free_list_.empty()) {
-    frame_id = this->free_list_.front();
-    this->free_list_.pop_front();
+  if (!this->free_frames_.empty()) {
+    frame_id = this->free_frames_.front();
+    this->free_frames_.pop_front();
   } else {
     auto victim = this->replacer_.evict();
     if (!victim.has_value()) {
@@ -75,7 +203,7 @@ storage::page::Page *BufferPoolManager::fetch_page(FileId file_id,
   }
 
   // fetch new page from disk
-  this->disk_manager_->read_page(file_id, page_id, frame.data());
+  this->disk_manager_->read_page(file_id, page_id, frame.data_mut());
 
   frame.file_id_ = file_id;
   frame.page_id_ = page_id;
@@ -92,9 +220,7 @@ storage::page::Page *BufferPoolManager::fetch_page(FileId file_id,
 
 bool BufferPoolManager::unpin_page(FileId file_id, PageId page_id,
                                    bool is_dirty) {
-  // std::lock_guard<std::mutex> guard(this->latch_);
   std::scoped_lock<std::mutex> guard(*this->bpm_latch_);
-  // this->bpm_latch_->lock();
 
   PageKey key{file_id, page_id};
   if (!this->page_table_.count(key)) {
@@ -114,7 +240,6 @@ bool BufferPoolManager::unpin_page(FileId file_id, PageId page_id,
   }
 
   if (page.pin_count_ == 0) {
-    // this->replacer_.unpin(frame_id);
     this->replacer_.set_evictable(frame_id, true);
   }
 
@@ -122,9 +247,7 @@ bool BufferPoolManager::unpin_page(FileId file_id, PageId page_id,
 }
 
 bool BufferPoolManager::flush_page(FileId file_id, PageId page_id) {
-  // std::lock_guard<std::mutex> guard(this->latch_);
   std::scoped_lock<std::mutex> guard(*this->bpm_latch_);
-  // this->bpm_latch_->lock();
 
   PageKey key{file_id, page_id};
   if (!this->page_table_.count(key)) {
@@ -142,9 +265,7 @@ bool BufferPoolManager::flush_page(FileId file_id, PageId page_id) {
 }
 
 void BufferPoolManager::flush_all_pages() {
-  // std::lock_guard<std::mutex> guard(this->latch_);
   std::scoped_lock<std::mutex> guard(*this->bpm_latch_);
-  // this->bpm_latch_->lock();
 
   for (FrameId i = 0; i < static_cast<FrameId>(this->pool_size_); ++i) {
     storage::page::Page &page = this->pages_[i];
@@ -159,14 +280,12 @@ void BufferPoolManager::flush_all_pages() {
 
 storage::page::Page *BufferPoolManager::new_page(FileId file_id,
                                                  PageId *page_id) {
-  // std::lock_guard<std::mutex> guard(this->latch_);
   std::scoped_lock<std::mutex> guard(*this->bpm_latch_);
-  // this->bpm_latch_->lock();
 
   FrameId frame_id;
-  if (!this->free_list_.empty()) {
-    frame_id = this->free_list_.front();
-    this->free_list_.pop_front();
+  if (!this->free_frames_.empty()) {
+    frame_id = this->free_frames_.front();
+    this->free_frames_.pop_front();
   } else {
     auto victim = this->replacer_.evict();
     if (!victim.has_value()) {
@@ -207,7 +326,6 @@ storage::page::Page *BufferPoolManager::new_page(FileId file_id,
 
 bool BufferPoolManager::delete_page(FileId file_id, PageId page_id) {
   std::scoped_lock<std::mutex> guard(*this->bpm_latch_);
-  // this->bpm_latch_->lock();
 
   PageKey key{file_id, page_id};
   if (!this->page_table_.count(key)) {
@@ -224,8 +342,7 @@ bool BufferPoolManager::delete_page(FileId file_id, PageId page_id) {
 
   this->page_table_.erase(key);
   this->replacer_.remove(frame_id);
-  // this->replacer_.pin(frame_id);
-  this->free_list_.push_back(frame_id);
+  this->free_frames_.push_back(frame_id);
 
   page.reset_memory();
   page.page_id_ = INVALID_PAGE_ID;

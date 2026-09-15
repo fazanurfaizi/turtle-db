@@ -12,5 +12,11 @@ target_include_directories(${BUFFER_LIBRARY_NAME} PUBLIC
   ${CMAKE_SOURCE_DIR}/include
 )
 
-target_link_libraries(${BUFFER_LIBRARY_NAME} PRIVATE project_warnings)
+target_link_libraries(
+  ${BUFFER_LIBRARY_NAME} 
+  PUBLIC
+    fmt::fmt storage
+  PRIVATE
+    project_warnings
+)
 

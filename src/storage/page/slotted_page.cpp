@@ -1,14 +1,9 @@
 #include "turtle/storage/page/slotted_page.hpp"
 #include "turtle/common/config.hpp"
 #include "turtle/common/record_id.hpp"
-#include "turtle/storage/page/page.hpp"
 #include <cstdint>
 
 namespace turtle::storage::page {
-
-SlottedPage::SlottedPage(Page *page) : page_(page) {}
-
-SlottedPage::~SlottedPage() = default;
 
 void SlottedPage::init(PageId page_id) {
   Header *header = this->header();
@@ -32,7 +27,7 @@ void SlottedPage::delete_tuple(const RecordId &rid) {
 }
 
 uint32_t SlottedPage::free_space_remaining() const {
-  Header *header = this->header();
+  const Header *header = this->header();
   // Free space = (Start of Data Area) - (End of Slot Array)
   uint32_t slot_array_end =
       sizeof(Header) + (header->slot_count_ * sizeof(Slot));
@@ -44,9 +39,7 @@ uint32_t SlottedPage::tuple_count() const {
   return this->header()->tuple_count_;
 }
 
-uint32_t SlottedPage::slot_count() const {
-  return this->header()->slot_count_;
-}
+uint32_t SlottedPage::slot_count() const { return this->header()->slot_count_; }
 
 bool SlottedPage::is_slot_occupied(uint32_t slot_num) const {
   if (slot_num >= this->header()->slot_count_) {
@@ -54,16 +47,6 @@ bool SlottedPage::is_slot_occupied(uint32_t slot_num) const {
   }
   return this->slots()[slot_num].length_ != 0;
 }
-
-SlottedPage::Header *SlottedPage::header() const {
-  return reinterpret_cast<Header *>(page_->data());
-}
-
-SlottedPage::Slot *SlottedPage::slots() const {
-  return reinterpret_cast<Slot *>(page_->data() + sizeof(SlottedPage::Header));
-}
-
-char *SlottedPage::data() const { return page_->data(); }
 
 void SlottedPage::validate_record_id(const RecordId &rid) const {
   if (rid.page_id != page_id() || rid.slot_num >= header()->slot_count_) {

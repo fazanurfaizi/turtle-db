@@ -64,10 +64,9 @@ auto ArcReplacer::evict() -> std::optional<FrameId> {
 }
 
 /**
- *  @param frame_id id of frame that received a new access.
+ * @param frame_id id of frame that received a new access.
  * @param page_id id of page that is mapped to the frame.
- * @param access_type type of access that was received. This parameter is only
- * needed for leaderboard tests.
+ * @param access_type type of access that was received.
  */
 void ArcReplacer::record_access(FrameId frame_id, PageId page_id,
                                 [[maybe_unused]] AccessType access_type) {

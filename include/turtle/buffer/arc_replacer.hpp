@@ -2,7 +2,6 @@
 
 #include "turtle/common/config.hpp"
 #include <cstddef>
-#include <iterator>
 #include <list>
 #include <memory>
 #include <mutex>
