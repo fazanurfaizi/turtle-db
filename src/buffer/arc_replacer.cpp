@@ -119,7 +119,7 @@ void ArcReplacer::record_access(FrameId frame_id, PageId page_id,
 
   // Total miss -> trim ghost metadata, then enter MRU.
   size_t t1 = this->mru_.size();
-  size_t b1 = this->mfu_ghost_.size();
+  size_t b1 = this->mru_ghost_.size();
   if (t1 + b1 == this->replacer_size_) {
     if (b1 > 0) { // drop the LRU (back) B1 ghost entry
       PageId dropped = this->mru_ghost_.back();
