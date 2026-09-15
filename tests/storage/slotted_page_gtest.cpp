@@ -78,6 +78,16 @@ protected:
     return p;
   }
 
+  const SlottedPage *read_page(PageId page_id) const {
+    auto page_guard = this->bpm_->read_page(this->file_, page_id);
+    return page_guard->as<page::SlottedPage>();
+  }
+
+  auto write_page(PageId page_id) {
+    auto page_guard = this->bpm_->write_page(this->file_, page_id);
+    return page_guard->as_mut<page::SlottedPage>();
+  }
+
   std::filesystem::path dir_;
   std::unique_ptr<storage::disk::DiskManager> disk_;
   std::unique_ptr<buffer::BufferPoolManager> bpm_;
@@ -88,57 +98,57 @@ protected:
 
 TEST_F(SlottedPageTest, InitEstablishesEmptyPage) {
   PageId pid = INVALID_PAGE_ID;
-  Page *p = fresh_page(&pid);
-  SlottedPage sp(p);
-  sp.init(pid);
+  // Page *p = fresh_page(&pid);
+  auto sp = write_page(pid);
+  sp->init(pid);
 
-  EXPECT_EQ(sp.page_id(), pid);
-  EXPECT_EQ(sp.tuple_count(), 0u);
-  EXPECT_EQ(sp.slot_count(), 0u);
-  EXPECT_GT(sp.free_space_remaining(), 0u);
-  EXPECT_LT(sp.free_space_remaining(), PAGE_SIZE); // header consumes some
-  EXPECT_EQ(sp.get_next_page_id(), INVALID_PAGE_ID);
+  EXPECT_EQ(sp->page_id(), pid);
+  EXPECT_EQ(sp->tuple_count(), 0u);
+  EXPECT_EQ(sp->slot_count(), 0u);
+  EXPECT_GT(sp->free_space_remaining(), 0u);
+  EXPECT_LT(sp->free_space_remaining(), PAGE_SIZE); // header consumes some
+  EXPECT_EQ(sp->get_next_page_id(), INVALID_PAGE_ID);
 }
 
 // ---- insert / read round trip ---------------------------------------------
 
 TEST_F(SlottedPageTest, InsertThenReadRoundTrips) {
   PageId pid = INVALID_PAGE_ID;
-  SlottedPage sp(fresh_page(&pid));
-  sp.init(pid);
+  auto sp = write_page(pid);
+  sp->init(pid);
 
   FakeTuple in{"hello slotted page"};
   RecordId rid;
-  ASSERT_TRUE(sp.insert_tuple(in, &rid));
+  ASSERT_TRUE(sp->insert_tuple(in, &rid));
 
   EXPECT_EQ(rid.page_id, pid);
   EXPECT_EQ(rid.slot_num, 0u);
-  EXPECT_EQ(sp.tuple_count(), 1u);
-  EXPECT_EQ(sp.slot_count(), 1u);
-  EXPECT_TRUE(sp.is_slot_occupied(0));
+  EXPECT_EQ(sp->tuple_count(), 1u);
+  EXPECT_EQ(sp->slot_count(), 1u);
+  EXPECT_TRUE(sp->is_slot_occupied(0));
 
   FakeTuple out;
-  sp.tuple(rid, &out);
+  sp->tuple(rid, &out);
   EXPECT_EQ(out.payload, in.payload);
 }
 
 TEST_F(SlottedPageTest, MultipleInsertsGetSequentialSlots) {
   PageId pid = INVALID_PAGE_ID;
-  SlottedPage sp(fresh_page(&pid));
-  sp.init(pid);
+  auto sp = write_page(pid);
+  sp->init(pid);
 
   for (uint32_t i = 0; i < 3; ++i) {
     FakeTuple t{"row-" + std::to_string(i)};
     RecordId rid;
-    ASSERT_TRUE(sp.insert_tuple(t, &rid));
+    ASSERT_TRUE(sp->insert_tuple(t, &rid));
     EXPECT_EQ(rid.slot_num, i);
   }
-  EXPECT_EQ(sp.tuple_count(), 3u);
-  EXPECT_EQ(sp.slot_count(), 3u);
+  EXPECT_EQ(sp->tuple_count(), 3u);
+  EXPECT_EQ(sp->slot_count(), 3u);
 
   // Read the middle row back to confirm slots are independent.
   FakeTuple out;
-  sp.tuple(RecordId{pid, 1u}, &out);
+  sp->tuple(RecordId{pid, 1u}, &out);
   EXPECT_EQ(out.payload, "row-1");
 }
 
@@ -146,14 +156,14 @@ TEST_F(SlottedPageTest, MultipleInsertsGetSequentialSlots) {
 
 TEST_F(SlottedPageTest, EachInsertConsumesPayloadPlusSlot) {
   PageId pid = INVALID_PAGE_ID;
-  SlottedPage sp(fresh_page(&pid));
-  sp.init(pid);
+  auto sp = write_page(pid);
+  sp->init(pid);
 
   FakeTuple t{std::string(100, 'x')}; // 100-byte payload
-  const uint32_t before = sp.free_space_remaining();
+  const uint32_t before = sp->free_space_remaining();
   RecordId rid;
-  ASSERT_TRUE(sp.insert_tuple(t, &rid));
-  const uint32_t after = sp.free_space_remaining();
+  ASSERT_TRUE(sp->insert_tuple(t, &rid));
+  const uint32_t after = sp->free_space_remaining();
 
   EXPECT_EQ(before - after, t.storage_size() + kSlotSize);
 }
@@ -162,97 +172,97 @@ TEST_F(SlottedPageTest, EachInsertConsumesPayloadPlusSlot) {
 
 TEST_F(SlottedPageTest, InsertFailsWhenPageIsFull) {
   PageId pid = INVALID_PAGE_ID;
-  SlottedPage sp(fresh_page(&pid));
-  sp.init(pid);
+  auto sp = write_page(pid);
+  sp->init(pid);
 
   // ~2000-byte payloads: two fit on a 4 KiB page, the third cannot.
   FakeTuple big{std::string(2000, 'z')};
   RecordId rid;
-  ASSERT_TRUE(sp.insert_tuple(big, &rid));
-  ASSERT_TRUE(sp.insert_tuple(big, &rid));
-  EXPECT_FALSE(sp.insert_tuple(big, &rid)); // no room
+  ASSERT_TRUE(sp->insert_tuple(big, &rid));
+  ASSERT_TRUE(sp->insert_tuple(big, &rid));
+  EXPECT_FALSE(sp->insert_tuple(big, &rid)); // no room
 
   // A rejected insert must not mutate counts.
-  EXPECT_EQ(sp.tuple_count(), 2u);
-  EXPECT_EQ(sp.slot_count(), 2u);
+  EXPECT_EQ(sp->tuple_count(), 2u);
+  EXPECT_EQ(sp->slot_count(), 2u);
 }
 
 // ---- delete (soft) ---------------------------------------------------------
 
 TEST_F(SlottedPageTest, DeleteMarksSlotEmptyButKeepsSlotCount) {
   PageId pid = INVALID_PAGE_ID;
-  SlottedPage sp(fresh_page(&pid));
-  sp.init(pid);
+  auto sp = write_page(pid);
+  sp->init(pid);
 
   RecordId r0, r1;
-  ASSERT_TRUE(sp.insert_tuple(FakeTuple{"keep"}, &r0));
-  ASSERT_TRUE(sp.insert_tuple(FakeTuple{"drop"}, &r1));
+  ASSERT_TRUE(sp->insert_tuple(FakeTuple{"keep"}, &r0));
+  ASSERT_TRUE(sp->insert_tuple(FakeTuple{"drop"}, &r1));
 
-  sp.delete_tuple(r1);
+  sp->delete_tuple(r1);
 
-  EXPECT_EQ(sp.tuple_count(), 1u);       // live tuples decremented
-  EXPECT_EQ(sp.slot_count(), 2u);        // slot array not compacted
-  EXPECT_FALSE(sp.is_slot_occupied(1));  // slot 1 now empty
-  EXPECT_TRUE(sp.is_slot_occupied(0));   // slot 0 still live
+  EXPECT_EQ(sp->tuple_count(), 1u);      // live tuples decremented
+  EXPECT_EQ(sp->slot_count(), 2u);       // slot array not compacted
+  EXPECT_FALSE(sp->is_slot_occupied(1)); // slot 1 now empty
+  EXPECT_TRUE(sp->is_slot_occupied(0));  // slot 0 still live
 }
 
 TEST_F(SlottedPageTest, ReadingDeletedTupleThrows) {
   PageId pid = INVALID_PAGE_ID;
-  SlottedPage sp(fresh_page(&pid));
-  sp.init(pid);
+  auto sp = write_page(pid);
+  sp->init(pid);
 
   RecordId rid;
-  ASSERT_TRUE(sp.insert_tuple(FakeTuple{"gone"}, &rid));
-  sp.delete_tuple(rid);
+  ASSERT_TRUE(sp->insert_tuple(FakeTuple{"gone"}, &rid));
+  sp->delete_tuple(rid);
 
   FakeTuple out;
-  EXPECT_THROW(sp.tuple(rid, &out), std::runtime_error);
+  EXPECT_THROW(sp->tuple(rid, &out), std::runtime_error);
 }
 
 // ---- RecordId validation (error handling) ----------------------------------
 
 TEST_F(SlottedPageTest, ReadWithForeignPageIdThrows) {
   PageId pid = INVALID_PAGE_ID;
-  SlottedPage sp(fresh_page(&pid));
-  sp.init(pid);
+  auto sp = write_page(pid);
+  sp->init(pid);
   RecordId rid;
-  ASSERT_TRUE(sp.insert_tuple(FakeTuple{"data"}, &rid));
+  ASSERT_TRUE(sp->insert_tuple(FakeTuple{"data"}, &rid));
 
   FakeTuple out;
   RecordId foreign{pid + 100u, 0u}; // page id does not match this page
-  EXPECT_THROW(sp.tuple(foreign, &out), std::runtime_error);
+  EXPECT_THROW(sp->tuple(foreign, &out), std::runtime_error);
 }
 
 TEST_F(SlottedPageTest, ReadWithOutOfRangeSlotThrows) {
   PageId pid = INVALID_PAGE_ID;
-  SlottedPage sp(fresh_page(&pid));
-  sp.init(pid);
-  ASSERT_TRUE(sp.insert_tuple(FakeTuple{"only"}, nullptr));
+  auto sp = write_page(pid);
+  sp->init(pid);
+  ASSERT_TRUE(sp->insert_tuple(FakeTuple{"only"}, nullptr));
 
   FakeTuple out;
   RecordId beyond{pid, 5u}; // only slot 0 exists
-  EXPECT_THROW(sp.tuple(beyond, &out), std::runtime_error);
+  EXPECT_THROW(sp->tuple(beyond, &out), std::runtime_error);
 }
 
 TEST_F(SlottedPageTest, IsSlotOccupiedFalseForOutOfRange) {
   PageId pid = INVALID_PAGE_ID;
-  SlottedPage sp(fresh_page(&pid));
-  sp.init(pid);
-  EXPECT_FALSE(sp.is_slot_occupied(0));   // nothing inserted yet
-  EXPECT_FALSE(sp.is_slot_occupied(999)); // wildly out of range
+  auto sp = write_page(pid);
+  sp->init(pid);
+  EXPECT_FALSE(sp->is_slot_occupied(0));   // nothing inserted yet
+  EXPECT_FALSE(sp->is_slot_occupied(999)); // wildly out of range
 }
 
 // ---- page chaining ---------------------------------------------------------
 
 TEST_F(SlottedPageTest, NextPageIdRoundTrips) {
   PageId pid = INVALID_PAGE_ID;
-  SlottedPage sp(fresh_page(&pid));
-  sp.init(pid);
-  EXPECT_EQ(sp.get_next_page_id(), INVALID_PAGE_ID);
+  auto sp = write_page(pid);
+  sp->init(pid);
+  EXPECT_EQ(sp->get_next_page_id(), INVALID_PAGE_ID);
 
   PageId next = 77u;
-  sp.set_next_page_id(next);
-  EXPECT_EQ(sp.get_next_page_id(), 77u);
+  sp->set_next_page_id(next);
+  EXPECT_EQ(sp->get_next_page_id(), 77u);
 }
 
 } // namespace

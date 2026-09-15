@@ -1,11 +1,12 @@
 // -----------------------------------------------------------------------------
-// Tier 1 (Foundation) — turtle::buffer::BufferPoolManager (+ storage::page::Page
-// accessors, which are only observable through the pool since Page's metadata
-// is friend-mutable by the BPM alone).
+// Tier 1 (Foundation) — turtle::buffer::BufferPoolManager (+
+// storage::page::Page accessors, which are only observable through the pool
+// since Page's metadata is friend-mutable by the BPM alone).
 //
 // This is the single most load-bearing component in the engine: every table
 // scan and every executor pulls pages through here. The tests exercise the full
-// pin lifecycle, eviction + dirty write-back, pool exhaustion, and delete rules.
+// pin lifecycle, eviction + dirty write-back, pool exhaustion, and delete
+// rules.
 //
 // Fixture: BufferPoolManagerTest owns a DiskManager + one backing file, plus a
 // pool of a configurable (small) size so exhaustion/eviction paths are cheap to
@@ -13,7 +14,6 @@
 // pinned pages never leak across tests (the BPM frees its frame arrays in its
 // dtor regardless of pin state).
 // -----------------------------------------------------------------------------
-#include <array>
 #include <cstring>
 #include <filesystem>
 #include <string>
@@ -81,7 +81,7 @@ TEST_F(BufferPoolManagerTest, NewPageReturnsPinnedPageWithIdStartingAtZero) {
   auto *page = bpm->new_page(file_, &pid);
 
   ASSERT_NE(page, nullptr);
-  EXPECT_EQ(pid, 0u);              // global next_page_id_ starts at 0
+  EXPECT_EQ(pid, 0u); // global next_page_id_ starts at 0
   EXPECT_EQ(page->page_id(), 0u);
   EXPECT_EQ(page->file_id(), file_);
   EXPECT_EQ(page->pin_count(), 1); // freshly created pages arrive pinned
@@ -105,21 +105,23 @@ TEST_F(BufferPoolManagerTest, FetchCachedPageIncrementsPinAndReturnsSameFrame) {
   auto *bpm = make_pool(4);
   PageId pid = INVALID_PAGE_ID;
   auto *created = bpm->new_page(file_, &pid); // pin_count == 1
+  ASSERT_NE(created, nullptr);
 
-  auto *fetched = bpm->fetch_page(file_, pid); // pin_count == 2
-  EXPECT_EQ(created, fetched);
-  EXPECT_EQ(fetched->pin_count(), 2);
+  auto guard = bpm->read_page(file_, pid); // pin_count == 2
+  ASSERT_TRUE(guard.has_value());
+  EXPECT_EQ(guard->page(), created);
+  EXPECT_EQ(created->pin_count(), 2);
 }
 
 // ---- dirty data survives a round trip through disk -------------------------
 
 TEST_F(BufferPoolManagerTest, DirtyPageIsWrittenBackOnEvictionAndReadBack) {
-  auto *bpm = make_pool(1); // size 1 forces eviction on the next new_page
+  auto *bpm = make_pool(2); // size 1 forces eviction on the next new_page
 
   PageId pid0 = INVALID_PAGE_ID;
   auto *p0 = bpm->new_page(file_, &pid0);
   ASSERT_NE(p0, nullptr);
-  fill(p0->data(), 0x5A);
+  fill(p0->data_mut(), 0x5A);
   ASSERT_TRUE(bpm->unpin_page(file_, pid0, /*is_dirty=*/true));
 
   // Allocating a second page must evict p0 and flush its dirty contents.
@@ -129,7 +131,8 @@ TEST_F(BufferPoolManagerTest, DirtyPageIsWrittenBackOnEvictionAndReadBack) {
   ASSERT_TRUE(bpm->unpin_page(file_, pid1, /*is_dirty=*/false));
 
   // Fetch p0 back: its bytes must have persisted through the write-back.
-  auto *reloaded = bpm->fetch_page(file_, pid0);
+  auto guard = bpm->read_page(file_, pid0); // pin_count == 2
+  auto *reloaded = guard->page();
   ASSERT_NE(reloaded, nullptr);
   EXPECT_TRUE(matches(reloaded->data(), 0x5A));
   EXPECT_TRUE(bpm->unpin_page(file_, pid0, /*is_dirty=*/false));
@@ -216,7 +219,7 @@ TEST_F(BufferPoolManagerTest, FlushClearsDirtyFlag) {
   auto *bpm = make_pool(4);
   PageId pid = INVALID_PAGE_ID;
   auto *p = bpm->new_page(file_, &pid);
-  fill(p->data(), 0x0C);
+  fill(p->data_mut(), 0x0C);
   ASSERT_TRUE(bpm->unpin_page(file_, pid, /*is_dirty=*/true));
   EXPECT_TRUE(p->is_dirty());
 
