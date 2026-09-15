@@ -94,40 +94,6 @@ void DiskManager::read_page(FileId file_id, PageId page_id, char *page_data) {
   if (ready_bytes < static_cast<std::streamsize>(PAGE_SIZE)) {
     std::memset(page_data + ready_bytes, 0, PAGE_SIZE - ready_bytes);
   }
-
-  // if (this->files_.find(file_path) == this->files_.end()) {
-  //   // Ensure the directory exists
-  //   std::filesystem::path p(file_path);
-  //   if (p.has_parent_path() && !std::filesystem::exists(p.parent_path())) {
-  //     std::filesystem::create_directories(p.parent_path());
-  //   }
-  //
-  //   this->files_[file_path].open(file_path,
-  //                                       std::ios::in | std::ios::out |
-  //                                           std::ios::binary |
-  //                                           std::ios::app);
-  //   if (!this->files_[file_path].is_open()) {
-  //     throw std::runtime_error("Could not open file for reading: " +
-  //     file_path);
-  //   }
-  // }
-  //
-  // std::fstream &file = this->files_[file_path];
-  // int offset = page_id * PAGE_SIZE;
-  //
-  // file.seekg(offset);
-  // if (file.fail() || file.eof()) {
-  //   file.clear();
-  //   std::fill(page_data, page_data + PAGE_SIZE, 0);
-  //   return;
-  // }
-  //
-  // file.read(page_data, PAGE_SIZE);
-  // if (file.gcount() == 0) {
-  //   std::fill(page_data, page_data + PAGE_SIZE, 0);
-  // } else if (file.gcount() < PAGE_SIZE && file.gcount() > 0) {
-  //   std::fill(page_data + file.gcount(), page_data + PAGE_SIZE, 0);
-  // }
 }
 
 void DiskManager::write_page(FileId file_id, PageId page_id,
@@ -142,7 +108,7 @@ void DiskManager::write_page(FileId file_id, PageId page_id,
   std::fstream &file = *it->second;
   std::streamoff offset = static_cast<std::streamoff>(page_id) * PAGE_SIZE;
 
-  file.seekg(offset, std::ios::beg);
+  file.seekp(offset, std::ios::beg);
   file.write(page_data, PAGE_SIZE);
 
   if (file.fail()) {
@@ -150,43 +116,30 @@ void DiskManager::write_page(FileId file_id, PageId page_id,
   }
 
   file.flush();
-  //   // Ensure directory exists
-  //   std::filesystem::path p(file_path);
-  //   if (p.has_parent_path() && !std::filesystem::exists(p.parent_path())) {
-  //     std::filesystem::create_directories(p.parent_path());
-  //   }
-  //
-  //   // Try to open for read/write; if it fails, create the file first
-  //   std::fstream fs(file_path, std::ios::in | std::ios::out |
-  //   std::ios::binary); if (!fs.is_open()) {
-  //     std::ofstream create(file_path,
-  //                          std::ios::out | std::ios::binary |
-  //                          std::ios::trunc);
-  //     create.close();
-  //     fs.open(file_path, std::ios::in | std::ios::out | std::ios::binary);
-  //   }
-  //
-  //   if (!fs.is_open()) {
-  //     throw std::runtime_error("Could not open file for writing: " +
-  //     file_path);
-  //   }
-  //   this->files_[file_path] = std::move(fs);
-  // }
-  //
-  // std::fstream &file = this->files_[file_path];
-  // std::streamoff offset = static_cast<std::streamoff>(page_id) * PAGE_SIZE;
-  //
-  // file.seekp(offset);
-  // if (!file.good())
-  //   file.clear();
-  //
-  // file.write(page_data, PAGE_SIZE);
-  //
-  // if (file.fail()) {
-  //   throw std::runtime_error("Error writing to file: " + file_path);
-  // }
-  //
-  // file.flush(); // Ensure data is written to OS buffer
+}
+
+void DiskManager::delete_page(FileId file_id, PageId page_id) {
+  std::lock_guard<std::mutex> guard(this->latch_);
+
+  auto it = this->files_.find(file_id);
+  if (it == this->files_.end()) {
+    throw std::runtime_error("Invalid file id in delete_page");
+  }
+
+  // No free-space map yet, so we cannot truly reclaim the slot. Zero the page
+  // in place so its contents are gone and it reads back as an empty page.
+  std::fstream &file = *it->second;
+  std::streamoff offset = static_cast<std::streamoff>(page_id) * PAGE_SIZE;
+
+  char zeros[PAGE_SIZE] = {};
+  file.seekp(offset, std::ios::beg);
+  file.write(zeros, PAGE_SIZE);
+
+  if (file.fail()) {
+    throw std::runtime_error("Disk delete (zero-fill) failed");
+  }
+
+  file.flush();
 }
 
 } // namespace turtle::storage::disk

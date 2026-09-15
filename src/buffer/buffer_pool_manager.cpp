@@ -1,7 +1,7 @@
 #include <cstddef>
+#include <mutex>
 
 #include "turtle/buffer/buffer_pool_manager.hpp"
-#include "turtle/buffer/lru_replacer.hpp"
 #include "turtle/common/config.hpp"
 #include "turtle/storage/page/page.hpp"
 
@@ -9,7 +9,11 @@ namespace turtle::buffer {
 
 BufferPoolManager::BufferPoolManager(size_t pool_size,
                                      storage::disk::DiskManager *disk_manager)
-    : pool_size_(pool_size), replacer_(pool_size), disk_manager_(disk_manager) {
+    : pool_size_(pool_size), bpm_latch_(std::make_shared<std::mutex>()),
+      replacer_(pool_size), disk_manager_(disk_manager) {
+
+  std::scoped_lock latch(*this->bpm_latch_);
+
   this->pages_ = new storage::page::Page[this->pool_size_];
   this->frame_data_ = new char[this->pool_size_ * PAGE_SIZE];
 
@@ -27,7 +31,9 @@ BufferPoolManager::~BufferPoolManager() {
 
 storage::page::Page *BufferPoolManager::fetch_page(FileId file_id,
                                                    PageId page_id) {
-  std::lock_guard<std::mutex> guard(this->latch_);
+  // std::lock_guard<std::mutex> guard(this->latch_);
+  std::scoped_lock<std::mutex> guard(*this->bpm_latch_);
+  // this->bpm_latch_->lock();
 
   PageKey key{file_id, page_id};
 
@@ -37,7 +43,9 @@ storage::page::Page *BufferPoolManager::fetch_page(FileId file_id,
     storage::page::Page &page = this->pages_[frame_id];
 
     page.pin_count_++;
-    this->replacer_.pin(frame_id);
+    // this->replacer_.pin(frame_id);
+    this->replacer_.record_access(frame_id, page_id);
+    this->replacer_.set_evictable(frame_id, false);
 
     return &page;
   }
@@ -48,9 +56,11 @@ storage::page::Page *BufferPoolManager::fetch_page(FileId file_id,
     frame_id = this->free_list_.front();
     this->free_list_.pop_front();
   } else {
-    if (!this->replacer_.victim(&frame_id)) {
+    auto victim = this->replacer_.evict();
+    if (!victim.has_value()) {
       return nullptr; // All pages pinned
     }
+    frame_id = *victim;
   }
 
   storage::page::Page &frame = this->pages_[frame_id];
@@ -73,14 +83,18 @@ storage::page::Page *BufferPoolManager::fetch_page(FileId file_id,
   frame.is_dirty_ = false;
 
   this->page_table_[key] = frame_id;
-  this->replacer_.pin(frame_id);
+  // this->replacer_.pin(frame_id);
+  this->replacer_.record_access(frame_id, page_id);
+  this->replacer_.set_evictable(frame_id, false);
 
   return &frame;
 }
 
 bool BufferPoolManager::unpin_page(FileId file_id, PageId page_id,
                                    bool is_dirty) {
-  std::lock_guard<std::mutex> guard(this->latch_);
+  // std::lock_guard<std::mutex> guard(this->latch_);
+  std::scoped_lock<std::mutex> guard(*this->bpm_latch_);
+  // this->bpm_latch_->lock();
 
   PageKey key{file_id, page_id};
   if (!this->page_table_.count(key)) {
@@ -100,14 +114,17 @@ bool BufferPoolManager::unpin_page(FileId file_id, PageId page_id,
   }
 
   if (page.pin_count_ == 0) {
-    this->replacer_.unpin(frame_id);
+    // this->replacer_.unpin(frame_id);
+    this->replacer_.set_evictable(frame_id, true);
   }
 
   return true;
 }
 
 bool BufferPoolManager::flush_page(FileId file_id, PageId page_id) {
-  std::lock_guard<std::mutex> guard(this->latch_);
+  // std::lock_guard<std::mutex> guard(this->latch_);
+  std::scoped_lock<std::mutex> guard(*this->bpm_latch_);
+  // this->bpm_latch_->lock();
 
   PageKey key{file_id, page_id};
   if (!this->page_table_.count(key)) {
@@ -125,7 +142,9 @@ bool BufferPoolManager::flush_page(FileId file_id, PageId page_id) {
 }
 
 void BufferPoolManager::flush_all_pages() {
-  std::lock_guard<std::mutex> guard(this->latch_);
+  // std::lock_guard<std::mutex> guard(this->latch_);
+  std::scoped_lock<std::mutex> guard(*this->bpm_latch_);
+  // this->bpm_latch_->lock();
 
   for (FrameId i = 0; i < static_cast<FrameId>(this->pool_size_); ++i) {
     storage::page::Page &page = this->pages_[i];
@@ -140,16 +159,20 @@ void BufferPoolManager::flush_all_pages() {
 
 storage::page::Page *BufferPoolManager::new_page(FileId file_id,
                                                  PageId *page_id) {
-  std::lock_guard<std::mutex> guard(this->latch_);
+  // std::lock_guard<std::mutex> guard(this->latch_);
+  std::scoped_lock<std::mutex> guard(*this->bpm_latch_);
+  // this->bpm_latch_->lock();
 
   FrameId frame_id;
   if (!this->free_list_.empty()) {
     frame_id = this->free_list_.front();
     this->free_list_.pop_front();
   } else {
-    if (!this->replacer_.victim(&frame_id)) {
+    auto victim = this->replacer_.evict();
+    if (!victim.has_value()) {
       return nullptr;
     }
+    frame_id = *victim;
   }
 
   storage::page::Page &frame = this->pages_[frame_id];
@@ -172,7 +195,9 @@ storage::page::Page *BufferPoolManager::new_page(FileId file_id,
   frame.is_dirty_ = false;
 
   this->page_table_[{file_id, *page_id}] = frame_id;
-  this->replacer_.pin(frame_id);
+  // this->replacer_.pin(frame_id);
+  this->replacer_.record_access(frame_id, *page_id);
+  this->replacer_.set_evictable(frame_id, false);
 
   // Write the empty page to disk to "reserve" its space
   this->disk_manager_->write_page(file_id, *page_id, frame.data());
@@ -181,7 +206,8 @@ storage::page::Page *BufferPoolManager::new_page(FileId file_id,
 }
 
 bool BufferPoolManager::delete_page(FileId file_id, PageId page_id) {
-  std::lock_guard<std::mutex> guard(this->latch_);
+  std::scoped_lock<std::mutex> guard(*this->bpm_latch_);
+  // this->bpm_latch_->lock();
 
   PageKey key{file_id, page_id};
   if (!this->page_table_.count(key)) {
@@ -197,7 +223,8 @@ bool BufferPoolManager::delete_page(FileId file_id, PageId page_id) {
   }
 
   this->page_table_.erase(key);
-  this->replacer_.pin(frame_id);
+  this->replacer_.remove(frame_id);
+  // this->replacer_.pin(frame_id);
   this->free_list_.push_back(frame_id);
 
   page.reset_memory();

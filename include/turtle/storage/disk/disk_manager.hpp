@@ -26,7 +26,7 @@ public:
 
   /**
    * @brief Reads a page from a specific file on disk.
-   * @param file_path The path to the file.
+   * @param file_id The ID of the registered path to the file.
    * @param page_id The ID of the page to read.
    * @param page_data A buffer to read the page data into.
    */
@@ -34,15 +34,22 @@ public:
 
   /**
    * @brief Writes a page to a specific file on disk.
-   * @param file_path The path to the file.
+   * @param file_id The ID of the registered path to the file.
    * @param page_id The ID of the page to write.
    * @param page_data The data to write to the page.
    */
   void write_page(FileId file_id, PageId page_id, const char *page_data);
 
+  /**
+   * @brief Delete a page from the database file. Reclaim the disk space.
+   * @param file_id The ID of the registered path to the file.
+   * @param page_id The ID of the page to write.
+   */
+  void delete_page(FileId file_id, PageId page_id);
+
 private:
   std::unordered_map<FileId, std::unique_ptr<std::fstream>> files_;
-  std::unordered_map<FileId, std::unique_ptr<std::fstream>> file_;
+  std::unique_ptr<std::fstream> file_;
   std::unordered_map<std::string, FileId> path_to_file_id_;
   std::mutex latch_;
 

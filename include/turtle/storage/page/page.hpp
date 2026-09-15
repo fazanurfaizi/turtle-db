@@ -23,9 +23,13 @@ private:
   friend class turtle::buffer::BufferPoolManager;
 
   char *data_{nullptr};
+
   FileId file_id_{0};
+
   PageId page_id_{INVALID_PAGE_ID};
+
   int pin_count_{0};
+
   bool is_dirty_{false};
 };
 

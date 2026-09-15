@@ -1,27 +1,30 @@
 #pragma once
-// Least Recently Used" (LRU) replacement policy
 
 #include <list>
 #include <mutex>
 #include <unordered_map>
 
+#include "turtle/buffer/replacer.hpp"
 #include "turtle/common/config.hpp"
 
 namespace turtle::buffer {
 
-class LRUReplacer {
+/**
+ * Least Recently Used" (LRU) replacement policy
+ */
+class LRUReplacer : public Replacer {
 public:
   explicit LRUReplacer(size_t num_pages);
-  ~LRUReplacer() = default;
+  ~LRUReplacer() override = default;
 
   // Prevent copying
   LRUReplacer(const LRUReplacer &) = delete;
   LRUReplacer &operator=(const LRUReplacer &) = delete;
 
-  bool victim(FrameId *frame_id);
-  void pin(FrameId frame_id);
-  void unpin(FrameId frame_id);
-  size_t size();
+  auto victim(FrameId *frame_id) -> bool override;
+  void pin(FrameId frame_id) override;
+  void unpin(FrameId frame_id) override;
+  auto size() -> size_t override;
 
 private:
   std::list<FrameId> lru_list_;
@@ -30,5 +33,4 @@ private:
   size_t capacity_;
 };
 
-} // namespace Turtle::Buffer
-
+} // namespace turtle::buffer

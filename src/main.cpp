@@ -262,7 +262,7 @@ void run_query(execution::ExecutorContext *ctx,
 int main() {
   auto disk_manager = std::make_unique<storage::disk::DiskManager>();
   auto bpm =
-      std::make_unique<buffer::BufferPoolManager>(10, disk_manager.get());
+      std::make_unique<buffer::BufferPoolManager>(128, disk_manager.get());
   auto catalog = std::make_unique<catalog::Catalog>(
       bpm.get(), disk_manager.get(), "test_db/turtle.catalog", "test_db");
 

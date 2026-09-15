@@ -4,7 +4,7 @@ namespace turtle::buffer {
 
 LRUReplacer::LRUReplacer(size_t num_pages) : capacity_(num_pages) {}
 
-bool LRUReplacer::victim(FrameId *frame_id) {
+auto LRUReplacer::victim(FrameId *frame_id) -> bool {
   std::lock_guard<std::mutex> guard(this->latch_);
   if (this->lru_list_.empty()) {
     return false;
@@ -32,9 +32,9 @@ void LRUReplacer::unpin(FrameId frame_id) {
   }
 }
 
-size_t LRUReplacer::size() {
+auto LRUReplacer::size() -> size_t {
   std::lock_guard<std::mutex> guard(this->latch_);
   return this->lru_list_.size();
 }
 
-} // namespace Turtle::Buffer
+} // namespace turtle::buffer

@@ -4,6 +4,7 @@ add_library(${BUFFER_LIBRARY_NAME} STATIC)
 
 target_sources(${BUFFER_LIBRARY_NAME} PRIVATE
   buffer_pool_manager.cpp
+  arc_replacer.cpp
   lru_replacer.cpp
 )
 
