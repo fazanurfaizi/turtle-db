@@ -52,7 +52,7 @@ auto ArcReplacer::evict() -> std::optional<FrameId> {
   // arbitrary.
   if (this->mru_.size() > this->mru_target_size_) {
     if (auto v =
-            try_evict(this->mru_, this->mfu_ghost_, ArcStatus::MRU_GHOST)) {
+            try_evict(this->mru_, this->mru_ghost_, ArcStatus::MRU_GHOST)) {
       return v;
     }
     return try_evict(this->mfu_, this->mfu_ghost_, ArcStatus::MFU_GHOST);
@@ -60,7 +60,7 @@ auto ArcReplacer::evict() -> std::optional<FrameId> {
   if (auto v = try_evict(this->mfu_, this->mfu_ghost_, ArcStatus::MFU_GHOST)) {
     return v;
   }
-  return try_evict(this->mru_, this->mfu_ghost_, ArcStatus::MRU_GHOST);
+  return try_evict(this->mru_, this->mru_ghost_, ArcStatus::MRU_GHOST);
 }
 
 /**
@@ -70,6 +70,7 @@ auto ArcReplacer::evict() -> std::optional<FrameId> {
  */
 void ArcReplacer::record_access(FrameId frame_id, PageId page_id,
                                 [[maybe_unused]] AccessType access_type) {
+  // TODO: scan resistance — Scan accesses must not promote into MFU
   std::lock_guard<std::mutex> guard(this->latch_);
 
   // hit on a live list (mfu or mru) -> promote to MFU front.
