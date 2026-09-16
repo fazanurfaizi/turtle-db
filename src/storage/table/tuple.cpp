@@ -127,7 +127,7 @@ datatype::Value Tuple::value(const catalog::ColumnSchema *schema,
   bool is_null = (bitmap_ptr[column_idx / 8] & (1 << (column_idx % 8))) != 0;
 
   if (is_null) {
-    return datatype::Value();
+    return datatype::Value(columns[column_idx].get_type());
   }
 
   // Deserialize value from buffer at calculated offset

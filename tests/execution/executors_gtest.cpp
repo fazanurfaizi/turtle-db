@@ -29,12 +29,17 @@
 #include "turtle/common/record_id.hpp"
 #include "turtle/datatype/data_types.hpp"
 #include "turtle/datatype/value.hpp"
+#include "turtle/datatype/value_factory.hpp"
 #include "turtle/execution/executor_context.hpp"
 #include "turtle/execution/executors/abstract_executor.hpp"
+#include "turtle/execution/executors/filter_executor.hpp"
 #include "turtle/execution/executors/insert_executor.hpp"
 #include "turtle/execution/executors/seq_scan_executor.hpp"
 #include "turtle/execution/executors/values_executor.hpp"
+#include "turtle/execution/expressions/column_value_expression.hpp"
+#include "turtle/execution/expressions/comparison_expression.hpp"
 #include "turtle/execution/expressions/constant_value_expression.hpp"
+#include "turtle/execution/plans/filter_plan.hpp"
 #include "turtle/execution/plans/insert_plan.hpp"
 #include "turtle/execution/plans/seq_scan_plan.hpp"
 #include "turtle/execution/plans/values_plan.hpp"
@@ -297,6 +302,73 @@ TEST_F(ExecutorTest, ValuesToInsertPipelineInsertsAndCounts) {
   EXPECT_EQ(out[0].value(&insert.get_output_schema(), 0).get_as<int32_t>(), 10);
 
   EXPECT_EQ(count_table_rows(), 10);
+}
+
+// ============================ FilterExecutor ================================
+//
+// End-to-end proof of the SQL WHERE boundary: a predicate that evaluates to NULL
+// ("unknown") must reject the row, exactly like a predicate that evaluates to
+// false. Only rows whose predicate is definitively TRUE survive. This exercises
+// FilterExecutor::passes() == `!is_null() && get_as<bool>()`.
+TEST_F(ExecutorTest, FilterDropsRowsWhosePredicateIsNullOrFalse) {
+  using datatype::ValueFactory;
+
+  // Rows: (1,"a"), (NULL id,"b"), (2,"c"). Predicate `id = 2`:
+  //   (1,"a") -> 1 = 2      -> FALSE   -> dropped
+  //   (NULL)  -> NULL = 2   -> unknown -> dropped (the case under test)
+  //   (2,"c") -> 2 = 2      -> TRUE    -> kept
+  std::vector<std::vector<AbstractExpressionRef>> values;
+  auto make_row = [](AbstractExpressionRef id, const std::string &name) {
+    std::vector<AbstractExpressionRef> row;
+    row.push_back(std::move(id));
+    row.push_back(std::make_shared<ConstantValueExpression>(
+        Value(DataType::VARCHAR, name)));
+    return row;
+  };
+  values.push_back(make_row(std::make_shared<ConstantValueExpression>(
+                                Value(DataType::INTEGER, static_cast<int32_t>(1))),
+                            "a"));
+  values.push_back(make_row(std::make_shared<ConstantValueExpression>(
+                                ValueFactory::get_null_value_by_type(
+                                    DataType::INTEGER)),
+                            "b"));
+  values.push_back(make_row(std::make_shared<ConstantValueExpression>(
+                                Value(DataType::INTEGER, static_cast<int32_t>(2))),
+                            "c"));
+
+  auto values_plan =
+      std::make_shared<plans::ValuesPlanNode>(people_schema_, values);
+  auto values_exec = std::make_unique<executors::ValuesExecutor>(
+      ctx_.get(), values_plan.get());
+
+  // predicate: id (column 0) = 2
+  auto id_col = std::make_shared<expressions::ColumnValueExpression>(
+      0, 0, people_->schema_.get_columns()[0]);
+  auto two = std::make_shared<ConstantValueExpression>(
+      Value(DataType::INTEGER, static_cast<int32_t>(2)));
+  expressions::AbstractExpressionRef predicate =
+      std::make_shared<expressions::ComparisonExpression>(
+          id_col, two, expressions::ComparisonType::Equal);
+
+  plans::FilterPlanNode filter_plan(people_schema_, predicate, values_plan);
+  executors::FilterExecutor filter(ctx_.get(), &filter_plan,
+                                   std::move(values_exec));
+
+  filter.init();
+  std::vector<Tuple> out;
+  std::vector<RecordId> out_rids;
+  std::vector<std::string> kept;
+  std::vector<Tuple> batch;
+  std::vector<RecordId> rids;
+  while (filter.next(&batch, &rids, 8)) {
+    for (auto &t : batch) {
+      kept.push_back(t.value(&filter.get_output_schema(), 1).to_string());
+    }
+  }
+
+  // Only the TRUE row survives; both FALSE and NULL rows are gone.
+  ASSERT_EQ(kept.size(), 1u);
+  EXPECT_EQ(kept[0], "c");
 }
 
 } // namespace
