@@ -8,6 +8,7 @@ target_sources(${EXECUTION_LIBRARY_NAME} PRIVATE
   executors/projection_executor.cpp
   executors/value_executor.cpp
   executors/filter_executor.cpp
+  executors/delete_executor.cpp
 )
 
 target_include_directories(${EXECUTION_LIBRARY_NAME}

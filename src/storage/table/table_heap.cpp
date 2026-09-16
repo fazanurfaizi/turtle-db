@@ -97,6 +97,17 @@ bool TableHeap::insert_tuple(const Tuple &tuple, RecordId *rid) {
   }
 }
 
+bool TableHeap::mark_delete(const RecordId &rid) {
+  auto write_page = this->bpm_->write_page(this->file_id_, rid.page_id);
+  if (!write_page.has_value()) {
+    return false;
+  }
+
+  auto *slotted_page(write_page->as_mut<page::SlottedPage>());
+  slotted_page->delete_tuple(rid);
+  return true;
+}
+
 bool TableHeap::get_tuple(const RecordId &rid, Tuple *tuple) {
   // Fetch specific page containing the tuple
   auto read_page = this->bpm_->read_page(this->file_id_, rid.page_id);

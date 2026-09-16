@@ -20,6 +20,7 @@
 #include "turtle/datatype/value_factory.hpp"
 #include "turtle/execution/executor_context.hpp"
 #include "turtle/execution/executors/abstract_executor.hpp"
+#include "turtle/execution/executors/delete_executor.hpp"
 #include "turtle/execution/executors/filter_executor.hpp"
 #include "turtle/execution/executors/insert_executor.hpp"
 #include "turtle/execution/executors/projection_executor.hpp"
@@ -30,6 +31,7 @@
 #include "turtle/execution/expressions/comparison_expression.hpp"
 #include "turtle/execution/expressions/constant_value_expression.hpp"
 #include "turtle/execution/expressions/logic_expression.hpp"
+#include "turtle/execution/plans/delete_plan.hpp"
 #include "turtle/execution/plans/filter_plan.hpp"
 #include "turtle/execution/plans/insert_plan.hpp"
 #include "turtle/execution/plans/projection_plan.hpp"
@@ -272,6 +274,57 @@ void run_query(execution::ExecutorContext *ctx,
   print_rows(projection_exec);
 }
 
+// Build and run SeqScan -> Filter(odd age) -> Delete over `people`, removing
+// every row whose `age` column is odd and reporting the deleted count.
+void run_delete(execution::ExecutorContext *ctx,
+                const catalog::ColumnSchemaRef &schema,
+                const std::vector<catalog::Column> &cols, TableOid table_oid) {
+  // Leaf: sequential scan streaming every row (carries each row's RID).
+  plans::SeqScanPlanNode scan_plan(schema, table_oid, "people");
+  auto scan_exec =
+      std::make_unique<executors::SeqScanExecutor>(ctx, &scan_plan);
+
+  // Predicate: (age % 2) != 0. `age` is column 2 (SMALLINT); the modulo result
+  // stays SMALLINT, so compare against a SMALLINT zero.
+  auto odd_age = std::make_shared<expr::ComparisonExpression>(
+      std::make_shared<expr::ArithmeticExpression>(
+          std::make_shared<expr::ColumnValueExpression>(0, 2, cols[2]),
+          std::make_shared<expr::ConstantValueExpression>(
+              datatype::ValueFactory::get_small_int_value(2)),
+          expr::ArithmeticType::Modulo),
+      std::make_shared<expr::ConstantValueExpression>(
+          datatype::ValueFactory::get_small_int_value(0)),
+      expr::ComparisonType::NotEqual);
+
+  plans::FilterPlanNode filter_plan(
+      schema, odd_age, std::make_shared<plans::SeqScanPlanNode>(scan_plan));
+  auto filter_exec = std::make_unique<executors::FilterExecutor>(
+      ctx, &filter_plan, std::move(scan_exec));
+
+  // DeleteExecutor emits a single INTEGER column holding the deleted count.
+  std::vector<catalog::Column> count_cols;
+  count_cols.emplace_back("count", datatype::DataType::INTEGER);
+  auto count_schema = std::make_shared<const catalog::ColumnSchema>(count_cols);
+
+  plans::DeletePlanNode delete_plan(
+      count_schema, std::make_shared<plans::FilterPlanNode>(filter_plan),
+      table_oid);
+  executors::DeleteExecutor delete_exec(ctx, &delete_plan,
+                                        std::move(filter_exec));
+
+  std::cout << "--- Deleting rows with odd age from table='"
+            << scan_plan.table_name_ << "' ---\n";
+  delete_exec.init();
+  std::vector<storage::table::Tuple> batch;
+  std::vector<RecordId> rids;
+  while (delete_exec.next(&batch, &rids, k_batch_size)) {
+    if (!batch.empty()) {
+      fmt::print("Deleted {} rows\n",
+                 batch[0].value(&delete_exec.get_output_schema(), 0));
+    }
+  }
+}
+
 } // namespace
 
 int main() {
@@ -290,6 +343,8 @@ int main() {
   execution::ExecutorContext ctx(catalog.get(), bpm.get(), false);
 
   run_insert(&ctx, schema, build_value_rows(k_row_count), table_info->oid_);
+  run_query(&ctx, schema, cols, table_info->oid_);
+  run_delete(&ctx, schema, cols, table_info->oid_);
   run_query(&ctx, schema, cols, table_info->oid_);
 
   return 0;
