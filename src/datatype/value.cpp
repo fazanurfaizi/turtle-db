@@ -129,7 +129,7 @@ auto Value::column() const -> turtle::catalog::Column {
   case DataType::VARCHAR:
     return catalog::Column{"<val>", DataType::VARCHAR, this->storage_size()};
   default:
-    return catalog::Column{"<val>", DataType::INTEGER};
+    return catalog::Column{"<val>", this->data_type()};
   }
 }
 

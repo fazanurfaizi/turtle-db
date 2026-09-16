@@ -25,6 +25,7 @@
 #include "turtle/execution/executors/projection_executor.hpp"
 #include "turtle/execution/executors/seq_scan_executor.hpp"
 #include "turtle/execution/executors/values_executor.hpp"
+#include "turtle/execution/expressions/arithmetic_expression.hpp"
 #include "turtle/execution/expressions/column_value_expression.hpp"
 #include "turtle/execution/expressions/comparison_expression.hpp"
 #include "turtle/execution/expressions/constant_value_expression.hpp"
@@ -61,6 +62,7 @@ auto make_people_columns() -> std::vector<catalog::Column> {
   cols.emplace_back("name", datatype::DataType::VARCHAR);
   cols.emplace_back("age", datatype::DataType::SMALLINT);
   cols.emplace_back("weight", datatype::DataType::INTEGER);
+  cols.emplace_back("height", datatype::DataType::INTEGER);
   cols.emplace_back("amount", datatype::DataType::DECIMAL);
   cols.emplace_back("is_lived", datatype::DataType::TINYINT);
   cols.emplace_back("is_active", datatype::DataType::BOOLEAN);
@@ -92,6 +94,7 @@ auto build_value_rows(int row_count)
         constant(datatype::ValueFactory::get_small_int_value(
             static_cast<int16_t>(id + 1))),
         constant(datatype::ValueFactory::get_integer_value(id * 7)),
+        constant(datatype::ValueFactory::get_integer_value(id * 10)),
         constant(datatype::ValueFactory::get_decimal_value(id * 1000)),
         constant(datatype::ValueFactory::get_tiny_int_value(
             static_cast<int8_t>(dist(gen)))),
@@ -182,13 +185,13 @@ void run_insert(execution::ExecutorContext *ctx,
 auto build_predicate(const std::vector<catalog::Column> &cols)
     -> AbstractExpressionRef {
   auto is_active_true = std::make_shared<expr::ComparisonExpression>(
-      std::make_shared<expr::ColumnValueExpression>(0, 6, cols[6]),
+      std::make_shared<expr::ColumnValueExpression>(0, 7, cols[7]),
       std::make_shared<expr::ConstantValueExpression>(
           datatype::ValueFactory::get_boolean_value(true)),
       expr::ComparisonType::Equal);
 
   auto is_lived_one = std::make_shared<expr::ComparisonExpression>(
-      std::make_shared<expr::ColumnValueExpression>(0, 5, cols[5]),
+      std::make_shared<expr::ColumnValueExpression>(0, 6, cols[6]),
       std::make_shared<expr::ConstantValueExpression>(
           datatype::ValueFactory::get_tiny_int_value(1)),
       expr::ComparisonType::Equal);
@@ -202,9 +205,12 @@ auto make_projection_columns() -> std::vector<catalog::Column> {
   std::vector<catalog::Column> cols;
   cols.emplace_back("id", datatype::DataType::BIGINT);
   cols.emplace_back("name", datatype::DataType::VARCHAR);
+  cols.emplace_back("weight", datatype::DataType::INTEGER);
+  cols.emplace_back("height", datatype::DataType::INTEGER);
   cols.emplace_back("is_lived", datatype::DataType::TINYINT);
   cols.emplace_back("is_active", datatype::DataType::BOOLEAN);
   cols.emplace_back("date_of_birth", datatype::DataType::TIMESTAMP);
+  cols.emplace_back("weight_height", datatype::DataType::INTEGER);
   return cols;
 }
 
@@ -227,7 +233,8 @@ void run_query(execution::ExecutorContext *ctx,
 
   // Projection: id, name, is_lived, is_active, date_of_birth. Column indices
   // reference the child (filter) schema — the full 8-col table:
-  // id=0, name=1, age=2, weight=3, amount=4, is_lived=5, is_active=6, dob=7.
+  // id=0, name=1, age=2, weight=3, height=4, amount=5, is_lived=6, is_active=7,
+  // dob=8.
   auto out_cols = make_projection_columns();
   auto out_schema = std::make_shared<const catalog::ColumnSchema>(out_cols);
 
@@ -237,11 +244,19 @@ void run_query(execution::ExecutorContext *ctx,
   projections.push_back(
       std::make_shared<expr::ColumnValueExpression>(0, 1, out_cols[1]));
   projections.push_back(
-      std::make_shared<expr::ColumnValueExpression>(0, 5, out_cols[2]));
+      std::make_shared<expr::ColumnValueExpression>(0, 3, out_cols[2]));
+  projections.push_back(
+      std::make_shared<expr::ColumnValueExpression>(0, 4, out_cols[3]));
   projections.push_back(
       std::make_shared<expr::ColumnValueExpression>(0, 6, out_cols[3]));
   projections.push_back(
       std::make_shared<expr::ColumnValueExpression>(0, 7, out_cols[4]));
+  projections.push_back(
+      std::make_shared<expr::ColumnValueExpression>(0, 8, out_cols[5]));
+  projections.push_back(std::make_shared<expr::ArithmeticExpression>(
+      std::make_shared<expr::ColumnValueExpression>(0, 3, cols[3]),
+      std::make_shared<expr::ColumnValueExpression>(0, 4, cols[4]),
+      execution::expressions::ArithmeticType::Addition));
 
   plans::ProjectionPlanNode projection_plan(
       out_schema, projections,

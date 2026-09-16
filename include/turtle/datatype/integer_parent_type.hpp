@@ -81,7 +81,7 @@ template <class T1, class T2>
 auto IntegerParentType::add_value(const Value &left, const Value &right) const
     -> Value {
   auto x = left.get_as<T1>();
-  auto y = left.get_as<T2>();
+  auto y = right.get_as<T2>();
   auto sum1 = static_cast<T1>(x + y);
   auto sum2 = static_cast<T2>(x + y);
 
