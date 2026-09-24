@@ -4,6 +4,8 @@
 #include "turtle/common/config.hpp"
 #include "turtle/common/record_id.hpp"
 #include "turtle/storage/table/tuple.hpp"
+#include <cstdint>
+#include <unordered_map>
 
 namespace turtle::storage::table {
 
@@ -46,9 +48,16 @@ public:
 
 private:
   buffer::BufferPoolManager *bpm_;
+
   FileId file_id_;
   PageId first_page_id_{INVALID_PAGE_ID};
   PageId last_page_id_{INVALID_PAGE_ID};
+
+  std::unordered_map<PageId, uint32_t> free_space_map_;
+
+  void update_free_space(PageId page_id, uint32_t usable_bytes) {
+    this->free_space_map_[page_id] = usable_bytes;
+  }
 };
 
 } // namespace turtle::storage::table

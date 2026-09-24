@@ -35,12 +35,20 @@ public:
   PageId page_id() const;
   uint32_t tuple_count() const;
 
+  uint32_t dead_space() const;
+
+  uint32_t usable_space() const;
+
   // Total number of slots ever allocated (active + deleted). Slot indices are
   // valid in [0, slot_count()); tuple_count() only counts non-deleted slots.
   uint32_t slot_count() const;
 
   // True if slot_num is in range and holds a live (non-deleted) tuple.
   bool is_slot_occupied(uint32_t slot_num) const;
+
+  void compact();
+
+  static constexpr size_t SLOT_SIZE = sizeof(uint32_t) * 2;
 
 private:
   struct Header {
@@ -49,6 +57,7 @@ private:
     uint32_t slot_count_;         // Total slots (active + empty)
     uint32_t tuple_count_;        // Active tuples
     uint32_t free_space_pointer_; // Offset to the start of free space
+    uint32_t dead_space_{0};
   };
 
   struct Slot {
@@ -82,14 +91,37 @@ private:
 template <typename T>
 bool SlottedPage::insert_tuple(const T &tuple, RecordId *record_id) {
   uint32_t size = tuple.storage_size();
-  if (this->free_space_remaining() < size + sizeof(Slot)) {
-    return false; // Not enough space
-  }
-
   Header *header = this->header();
 
+  // Check if an empty slot to reuse is exists
+  int reusable_slot_id = -1;
+  Slot *slot_arr = this->slots();
+  for (uint32_t i = 0; i < header->slot_count_; ++i) {
+    if (slot_arr[i].length_ == 0) {
+      reusable_slot_id = static_cast<int>(i);
+      break;
+    }
+  }
+
+  // Calculate needed space
+  uint32_t space_needed = size + (reusable_slot_id == -1 ? sizeof(Slot) : 0);
+
+  if (this->free_space_remaining() < space_needed) {
+    if (this->usable_space() >= space_needed) {
+      this->compact();
+    } else {
+      return false; // Not enough space
+    }
+  }
+
   // Prepare the new slot
-  uint32_t slot_id = header->slot_count_;
+  uint32_t slot_id;
+  if (reusable_slot_id != -1) {
+    slot_id = static_cast<uint32_t>(reusable_slot_id);
+  } else {
+    slot_id = header->slot_count_;
+    header->slot_count_++;
+  }
 
   // Allocate space in the data area (grow backwards)
   header->free_space_pointer_ -= size;
@@ -98,13 +130,10 @@ bool SlottedPage::insert_tuple(const T &tuple, RecordId *record_id) {
   // Write data
   tuple.serialize_to(this->data() + offset);
 
-  Slot *slots = this->slots();
   // Update slot info
+  Slot *slots = this->slots();
   slots[slot_id].offset_ = offset;
   slots[slot_id].length_ = size;
-
-  // Update header info
-  header->slot_count_++;
   header->tuple_count_++;
 
   if (record_id) {

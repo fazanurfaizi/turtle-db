@@ -3,7 +3,6 @@
 #include "turtle/datatype/value.hpp"
 #include "turtle/execution/executor_context.hpp"
 #include "turtle/execution/executors/abstract_executor.hpp"
-#include "turtle/execution/plans/insert_plan.hpp"
 #include "turtle/storage/table/tuple.hpp"
 #include <memory>
 #include <vector>
@@ -13,8 +12,8 @@ namespace turtle::execution::executors {
 /**
  * Construct a new DeleteExecutor instance.
  * @param exec_ctx The executor context
- * @param plan The insert to be executed
- * @param child_executor The child executor from which inserted tuples are
+ * @param plan The delete to be executed
+ * @param child_executor The child executor from which deleted tuples are
  * pulled
  */
 DeleteExecutor::DeleteExecutor(
@@ -23,7 +22,7 @@ DeleteExecutor::DeleteExecutor(
     : AbstractExecutor(exec_ctx), plan_(plan),
       child_executor_(std::move(child_executor)) {}
 
-/** Initialize the insert */
+/** Initialize the delete */
 void DeleteExecutor::init() {
   // Resolve the table heap from the catalog using the plan's table OID.
   auto *info =
@@ -42,13 +41,13 @@ void DeleteExecutor::init() {
 }
 
 /**
- * Pulls tuples from the child executor and inserts them into the target table.
+ * Pulls tuples from the child executor and delets them into the target table.
  * @param tuple_batch Filled with a marker tuple indicating the total number of
- * rows inserted
- * @param rid_batch Corresponding record IDs (typically unused for INSERT
+ * rows deleted
+ * @param rid_batch Corresponding record IDs (typically unused for DELETE
  * output)
  * @param batch_size Maximum tuples to process from the child per call
- * @return true if rows were inserted, false if the child executor is exhausted
+ * @return true if rows were deleted, false if the child executor is exhausted
  */
 auto DeleteExecutor::next(std::vector<storage::table::Tuple> *tuple_batch,
                           std::vector<RecordId> *rid_batch, size_t batch_size)
@@ -70,7 +69,7 @@ auto DeleteExecutor::next(std::vector<storage::table::Tuple> *tuple_batch,
     }
   }
 
-  // Create a count tuple containing the total rows inserted
+  // Create a count tuple containing the total rows deleted
   std::vector<datatype::Value> count_vals;
   count_vals.emplace_back(datatype::DataType::INTEGER,
                           static_cast<int32_t>(this->total_rows_deleted_));

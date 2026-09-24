@@ -12,6 +12,7 @@ class ReadPageGuard;
 class WritePageGuard;
 
 class Page {
+  friend class turtle::buffer::BufferPoolManager;
   friend class ReadPageGuard;
   friend class WritePageGuard;
 
@@ -29,8 +30,6 @@ public:
   void reset_memory() { std::memset(this->data_, 0, PAGE_SIZE); }
 
 private:
-  friend class turtle::buffer::BufferPoolManager;
-
   std::shared_ptr<std::shared_mutex> rw_latch_;
 
   char *data_{nullptr};
