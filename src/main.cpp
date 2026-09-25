@@ -25,6 +25,7 @@
 #include "turtle/execution/executors/insert_executor.hpp"
 #include "turtle/execution/executors/projection_executor.hpp"
 #include "turtle/execution/executors/seq_scan_executor.hpp"
+#include "turtle/execution/executors/update_executor.hpp"
 #include "turtle/execution/executors/values_executor.hpp"
 #include "turtle/execution/expressions/arithmetic_expression.hpp"
 #include "turtle/execution/expressions/column_value_expression.hpp"
@@ -36,6 +37,7 @@
 #include "turtle/execution/plans/insert_plan.hpp"
 #include "turtle/execution/plans/projection_plan.hpp"
 #include "turtle/execution/plans/seq_scan_plan.hpp"
+#include "turtle/execution/plans/update_plan.hpp"
 #include "turtle/execution/plans/values_plan.hpp"
 #include "turtle/storage/disk/disk_manager.hpp"
 #include "turtle/storage/table/tuple.hpp"
@@ -325,6 +327,55 @@ void run_delete(execution::ExecutorContext *ctx,
   }
 }
 
+void run_update(execution::ExecutorContext *ctx,
+                const catalog::ColumnSchemaRef &schema,
+                const std::vector<catalog::Column> &cols, TableOid table_oid) {
+  // Leaf: scan all existing tuples in the table heap
+  plans::SeqScanPlanNode scan_plan(schema, table_oid, "people");
+  auto scan_exec =
+      std::make_unique<executors::SeqScanExecutor>(ctx, &scan_plan);
+
+  std::vector<AbstractExpressionRef> target_expressions;
+  for (uint32_t i = 0; i < cols.size(); ++i) {
+    if (i == 1) {
+      target_expressions.push_back(
+          std::make_shared<expr::ConstantValueExpression>(
+              datatype::ValueFactory::get_varchar_value("updated_" +
+                                                        std::to_string(i))));
+    } else {
+      target_expressions.push_back(
+          std::make_shared<expr::ColumnValueExpression>(0, i, cols[i]));
+    }
+  }
+
+  // Schema for update count output
+  std::vector<catalog::Column> count_cols;
+  count_cols.emplace_back("count", datatype::DataType::INTEGER);
+  auto count_schema = std::make_shared<const catalog::ColumnSchema>(count_cols);
+
+  // Construct Update Plan Node
+  plans::UpdatePlanNode update_plan(
+      count_schema, std::make_shared<plans::SeqScanPlanNode>(scan_plan),
+      table_oid, target_expressions);
+
+  executors::UpdateExecutor update_exec(ctx, &update_plan,
+                                        std::move(scan_exec));
+
+  std::cout << "--- Updating rows's name to updated_{i} from table='"
+            << scan_plan.table_name_ << "' ---\n";
+
+  update_exec.init();
+
+  std::vector<storage::table::Tuple> batch;
+  std::vector<RecordId> rids;
+  while (update_exec.next(&batch, &rids, k_batch_size)) {
+    if (!batch.empty()) {
+      fmt::print("Updated {} rows\n",
+                 batch[0].value(&update_exec.get_output_schema(), 0));
+    }
+  }
+}
+
 } // namespace
 
 int main() {
@@ -343,8 +394,15 @@ int main() {
   execution::ExecutorContext ctx(catalog.get(), bpm.get(), false);
 
   run_insert(&ctx, schema, build_value_rows(k_row_count), table_info->oid_);
+  std::cout << "-----AFTER INSERT-----";
   run_query(&ctx, schema, cols, table_info->oid_);
+
   run_delete(&ctx, schema, cols, table_info->oid_);
+  std::cout << "-----AFTER DELETE-----";
+  run_query(&ctx, schema, cols, table_info->oid_);
+
+  run_update(&ctx, schema, cols, table_info->oid_);
+  std::cout << "-----AFTER UPDATE-----";
   run_query(&ctx, schema, cols, table_info->oid_);
 
   return 0;

@@ -24,10 +24,13 @@ struct TableInfo {
 
   /** The table name */
   const std::string name_;
+
   /** The table schema (columns) */
   ColumnSchema schema_;
+
   /** An owning pointer to the table heap */
   std::unique_ptr<storage::table::TableHeap> table_;
+
   /** The table OID */
   const TableOid oid_;
 };

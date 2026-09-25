@@ -90,7 +90,8 @@ bool TableHeap::insert_tuple(const Tuple &tuple, RecordId *rid) {
   }
 
   // Fetch the last page of the table where we usually have free space.
-  auto write_page_opt = this->bpm_->write_page(this->file_id_, this->last_page_id_);
+  auto write_page_opt =
+      this->bpm_->write_page(this->file_id_, this->last_page_id_);
   if (!write_page_opt.has_value()) {
     return false;
   }
@@ -102,7 +103,8 @@ bool TableHeap::insert_tuple(const Tuple &tuple, RecordId *rid) {
 
     // Try to insert the tuple into this page.
     if (slotted_page->insert_tuple(tuple, rid)) {
-      this->free_space_map_[write_page.page_id()] = slotted_page->usable_space();
+      this->free_space_map_[write_page.page_id()] =
+          slotted_page->usable_space();
       return true;
     }
 
@@ -132,12 +134,14 @@ bool TableHeap::insert_tuple(const Tuple &tuple, RecordId *rid) {
 }
 
 bool TableHeap::mark_delete(const RecordId &rid) {
-  auto write_page = this->bpm_->write_page(this->file_id_, rid.page_id);
-  if (!write_page.has_value()) {
+  auto write_page_opt = this->bpm_->write_page(this->file_id_, rid.page_id);
+  if (!write_page_opt.has_value()) {
     return false;
   }
 
-  auto *slotted_page(write_page->as_mut<page::SlottedPage>());
+  page::WritePageGuard write_page = std::move(*write_page_opt);
+
+  auto *slotted_page(write_page.as_mut<page::SlottedPage>());
   slotted_page->delete_tuple(rid);
 
   this->free_space_map_[rid.page_id] = slotted_page->usable_space();
