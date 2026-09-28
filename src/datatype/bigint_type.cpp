@@ -19,8 +19,8 @@ namespace turtle::datatype {
   case DataType::BIGINT:                                                       \
     return get_cmp_bool(left.value_.bigint_ OP right.get_as<int64_t>());       \
   case DataType::DECIMAL:                                                      \
-    return get_cmp_bool(static_cast<double>(left.value_.bigint_) OP            \
-                        right.get_as<double>());                               \
+    return get_cmp_bool(static_cast<double>(left.value_.bigint_)               \
+                            OP right.get_as<double>());                        \
   case DataType::VARCHAR: {                                                    \
     auto r_value = right.cast_as(DataType::BIGINT);                            \
     return get_cmp_bool(left.value_.bigint_ OP r_value.get_as<int64_t>());     \
@@ -45,9 +45,8 @@ namespace turtle::datatype {
     return METHOD<int64_t, int64_t>(left, right);                              \
   case DataType::DECIMAL:                                                      \
     /* NOLINTNEXTLINE */                                                       \
-    return Value(DataType::DECIMAL,                                            \
-                 static_cast<double>(left.value_.bigint_)                      \
-                     OP right.get_as<double>());                               \
+    return Value(DataType::DECIMAL, static_cast<double>(left.value_.bigint_)   \
+                                        OP right.get_as<double>());            \
   case DataType::VARCHAR: {                                                    \
     auto r_value = right.cast_as(DataType::BIGINT);                            \
     /* NOLINTNEXTLINE */                                                       \
@@ -139,9 +138,8 @@ auto BigintType::modulo(const Value &left, const Value &right) const -> Value {
   case DataType::BIGINT:
     return modulo_value<int64_t, int64_t>(left, right);
   case DataType::DECIMAL:
-    return {DataType::DECIMAL,
-            val_mod(static_cast<double>(left.value_.bigint_),
-                    right.get_as<double>())};
+    return {DataType::DECIMAL, val_mod(static_cast<double>(left.value_.bigint_),
+                                       right.get_as<double>())};
   case DataType::VARCHAR: {
     auto r_value = right.cast_as(DataType::BIGINT);
     return modulo_value<int64_t, int64_t>(left, r_value);

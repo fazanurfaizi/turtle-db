@@ -8,6 +8,7 @@
 #include "turtle/datatype/data_types.hpp"
 #include "turtle/datatype/value.hpp"
 #include "turtle/execution/expressions/abstract_expression.hpp"
+
 namespace turtle::execution::expressions {
 
 /** ArithmeticType represents the type of computation that we want to perform.
@@ -117,23 +118,6 @@ private:
     }
   }
 
-  static auto numeric_rank(datatype::DataType t) -> int {
-    switch (t) {
-    case datatype::DataType::TINYINT:
-      return 1;
-    case datatype::DataType::SMALLINT:
-      return 2;
-    case datatype::DataType::INTEGER:
-      return 3;
-    case datatype::DataType::BIGINT:
-      return 4;
-    case datatype::DataType::DECIMAL:
-      return 5;
-    default:
-      return 0;
-    }
-  }
-
   /** Result type of (left op right): the higher-ranked operand type */
   static auto infer_return_type(const AbstractExpressionRef &left,
                                 const AbstractExpressionRef &right)
@@ -144,7 +128,7 @@ private:
       throw NotImplementedException(
           "ArithmeticExpression only supports numeric operands");
     }
-    return numeric_rank(lt) >= numeric_rank(rt) ? lt : rt;
+    return datatype::Type::get_common_type(lt, rt);
   }
 
   auto perform_computation(const datatype::Value &left,

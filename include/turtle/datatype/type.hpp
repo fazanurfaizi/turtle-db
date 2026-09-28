@@ -3,8 +3,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <unordered_map>
 
 #include "data_types.hpp"
+#include "turtle/common/exceptions.hpp"
 
 namespace turtle::datatype {
 
@@ -83,6 +85,25 @@ public:
 
   // get the storage size of the value.
   virtual auto get_storage_size(const Value &value) const -> uint32_t;
+
+  static auto get_common_type(DataType t1, DataType t2) -> DataType {
+    if (t1 == t2)
+      return t1;
+
+    static const std::unordered_map<DataType, int> rank = {
+        {DataType::TINYINT, 1}, {DataType::SMALLINT, 2}, {DataType::INTEGER, 3},
+        {DataType::BIGINT, 4},  {DataType::DECIMAL, 5},
+    };
+
+    auto r1 = rank.find(t1);
+    auto r2 = rank.find(t2);
+
+    if (r1 == rank.end() || r2 == rank.end()) {
+      throw NotImplementedException("Incompatible types for numeric operation");
+    }
+
+    return r1->second >= r2->second ? t1 : t2;
+  }
 
 private:
   // Singleton instance

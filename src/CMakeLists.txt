@@ -12,14 +12,14 @@ add_subdirectory(storage)
 
 add_executable(main main.cpp)
 
-target_link_libraries(
-  main
-  PRIVATE buffer
-          catalog
-          common
-          concurrency
-          datatype
-          execution
-          storage
-          fmt::fmt
-          project_warnings)
+target_link_libraries(main PRIVATE
+  buffer
+  catalog
+  common
+  concurrency
+  datatype
+  execution
+  storage
+  fmt::fmt
+  project_warnings
+)

@@ -73,6 +73,32 @@ public:
     return {DataType::VARCHAR, value};
   }
 
+  static inline auto cast_as(const Value &value, DataType target_type)
+      -> Value {
+    switch (target_type) {
+    case DataType::BOOLEAN:
+      return cast_as_boolean(value);
+    case DataType::TINYINT:
+      return cast_as_tiny_int(value);
+    case DataType::SMALLINT:
+      return cast_as_small_int(value);
+    case DataType::INTEGER:
+      return cast_as_integer(value);
+    case DataType::BIGINT:
+      return cast_as_big_int(value);
+    case DataType::DECIMAL:
+      return cast_as_decimal(value);
+    case DataType::VARCHAR:
+      return cast_as_varchar(value);
+    case DataType::TIMESTAMP:
+      return cast_as_timestamp(value);
+    default:
+      break;
+    }
+    throw Exception(ExceptionType::UNKNOWN_TYPE,
+                    "Unsupported target data type for dynamic cast.");
+  }
+
   static inline auto get_null_value_by_type(DataType type_id) -> Value {
     Value ret_value;
     switch (type_id) {

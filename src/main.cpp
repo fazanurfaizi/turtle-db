@@ -18,8 +18,11 @@
 #include "turtle/datatype/type.hpp"
 #include "turtle/datatype/value.hpp"
 #include "turtle/datatype/value_factory.hpp"
+#include "turtle/execution/aggregation/aggregate_function.hpp"
+#include "turtle/execution/aggregation/aggregate_function_registry.hpp"
 #include "turtle/execution/executor_context.hpp"
 #include "turtle/execution/executors/abstract_executor.hpp"
+#include "turtle/execution/executors/aggregation_executor.hpp"
 #include "turtle/execution/executors/delete_executor.hpp"
 #include "turtle/execution/executors/filter_executor.hpp"
 #include "turtle/execution/executors/insert_executor.hpp"
@@ -32,6 +35,7 @@
 #include "turtle/execution/expressions/comparison_expression.hpp"
 #include "turtle/execution/expressions/constant_value_expression.hpp"
 #include "turtle/execution/expressions/logic_expression.hpp"
+#include "turtle/execution/plans/aggeration_plan.hpp"
 #include "turtle/execution/plans/delete_plan.hpp"
 #include "turtle/execution/plans/filter_plan.hpp"
 #include "turtle/execution/plans/insert_plan.hpp"
@@ -376,6 +380,70 @@ void run_update(execution::ExecutorContext *ctx,
   }
 }
 
+void run_aggregation(execution::ExecutorContext *ctx,
+                     const catalog::ColumnSchemaRef &schema,
+                     const std::vector<catalog::Column> &cols,
+                     TableOid table_oid) {
+  // Leaf: scan all existing tuples in the table heap
+  plans::SeqScanPlanNode scan_plan(schema, table_oid, "people");
+  auto scan_exec =
+      std::make_unique<executors::SeqScanExecutor>(ctx, &scan_plan);
+
+  // Group-by expressions: Empty vector for global aggregation (SELECT COUNT(*),
+  // SUM(amount))
+  std::vector<AbstractExpressionRef> group_bys;
+  group_bys.push_back(
+      std::make_shared<expr::ColumnValueExpression>(0, 6, cols[6]));
+  group_bys.push_back(
+      std::make_shared<expr::ColumnValueExpression>(0, 7, cols[7]));
+
+  // Aggregate argument expressions:
+  // 1. COUNT(*) -> Dummy constant or column reference (argument index 0 unused
+  // for count_star)
+  // 2. SUM(amount) -> ColumnValueExpression targeting `amount` (column index 5)
+  // 3. AVG(amount) -> ColumnValueExpression targeting `amount` (column index 5)
+  std::vector<AbstractExpressionRef> aggregates;
+  aggregates.push_back(
+      std::make_shared<expr::ColumnValueExpression>(0, 0, cols[0]));
+  aggregates.push_back(
+      std::make_shared<expr::ColumnValueExpression>(0, 5, cols[5]));
+  aggregates.push_back(
+      std::make_shared<expr::ColumnValueExpression>(0, 5, cols[5]));
+
+  // Aggregate functions from registry
+  std::vector<const execution::aggregation::AggregateFunction *> agg_funcs;
+  agg_funcs.push_back(
+      execution::aggregation::AggregateFunctionRegistry::get("count_star"));
+  agg_funcs.push_back(
+      execution::aggregation::AggregateFunctionRegistry::get("sum"));
+  agg_funcs.push_back(
+      execution::aggregation::AggregateFunctionRegistry::get("avg"));
+
+  // Define output schema for aggregation [count_star: BIGINT, sum_amount:
+  // DECIMAL]
+  std::vector<catalog::Column> out_cols;
+  out_cols.emplace_back("is_lived", datatype::DataType::TINYINT);
+  out_cols.emplace_back("is_active", datatype::DataType::BOOLEAN);
+  out_cols.emplace_back("count_star", datatype::DataType::BIGINT);
+  out_cols.emplace_back("sum_amount", datatype::DataType::DECIMAL);
+  out_cols.emplace_back("avg_amount", datatype::DataType::DECIMAL);
+  auto out_schema = std::make_shared<const catalog::ColumnSchema>(out_cols);
+
+  // Build aggregation plan node & executor
+  plans::AggregationPlanNode agg_plan(
+      out_schema, std::make_shared<plans::SeqScanPlanNode>(scan_plan),
+      group_bys, aggregates, agg_funcs);
+
+  executors::AggregationExecutor agg_exec(ctx, &agg_plan, std::move(scan_exec));
+
+  std::cout << "--- Aggregation (COUNT(*), SUM(amount), AVG(age)) over table='"
+            << scan_plan.table_name_ << "' ---\n";
+  print_schema_header(out_cols);
+
+  agg_exec.init();
+  print_rows(agg_exec);
+}
+
 } // namespace
 
 int main() {
@@ -404,6 +472,9 @@ int main() {
   run_update(&ctx, schema, cols, table_info->oid_);
   std::cout << "-----AFTER UPDATE-----";
   run_query(&ctx, schema, cols, table_info->oid_);
+
+  std::cout << "\n----- AGGREGATION AFTER DELETE -----\n";
+  run_aggregation(&ctx, schema, cols, table_info->oid_);
 
   return 0;
 }
