@@ -1,7 +1,5 @@
 #pragma once
 
-#include "fmt/format.h"
-#include "turtle/catalog/column.hpp"
 #include "turtle/datatype/value.hpp"
 #include "turtle/execution/expressions/abstract_expression.hpp"
 #include "turtle/storage/table/tuple.hpp"
