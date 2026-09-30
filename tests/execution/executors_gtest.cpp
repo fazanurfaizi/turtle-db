@@ -306,7 +306,8 @@ TEST_F(ExecutorTest, ValuesToInsertPipelineInsertsAndCounts) {
 
 // ============================ FilterExecutor ================================
 //
-// End-to-end proof of the SQL WHERE boundary: a predicate that evaluates to NULL
+// End-to-end proof of the SQL WHERE boundary: a predicate that evaluates to
+// NULL
 // ("unknown") must reject the row, exactly like a predicate that evaluates to
 // false. Only rows whose predicate is definitively TRUE survive. This exercises
 // FilterExecutor::passes() == `!is_null() && get_as<bool>()`.
@@ -325,15 +326,15 @@ TEST_F(ExecutorTest, FilterDropsRowsWhosePredicateIsNullOrFalse) {
         Value(DataType::VARCHAR, name)));
     return row;
   };
-  values.push_back(make_row(std::make_shared<ConstantValueExpression>(
-                                Value(DataType::INTEGER, static_cast<int32_t>(1))),
+  values.push_back(make_row(std::make_shared<ConstantValueExpression>(Value(
+                                DataType::INTEGER, static_cast<int32_t>(1))),
                             "a"));
-  values.push_back(make_row(std::make_shared<ConstantValueExpression>(
-                                ValueFactory::get_null_value_by_type(
-                                    DataType::INTEGER)),
-                            "b"));
-  values.push_back(make_row(std::make_shared<ConstantValueExpression>(
-                                Value(DataType::INTEGER, static_cast<int32_t>(2))),
+  values.push_back(
+      make_row(std::make_shared<ConstantValueExpression>(
+                   ValueFactory::get_null_value_by_type(DataType::INTEGER)),
+               "b"));
+  values.push_back(make_row(std::make_shared<ConstantValueExpression>(Value(
+                                DataType::INTEGER, static_cast<int32_t>(2))),
                             "c"));
 
   auto values_plan =
@@ -350,7 +351,7 @@ TEST_F(ExecutorTest, FilterDropsRowsWhosePredicateIsNullOrFalse) {
       std::make_shared<expressions::ComparisonExpression>(
           id_col, two, expressions::ComparisonType::Equal);
 
-  plans::FilterPlanNode filter_plan(people_schema_, predicate, values_plan);
+  plans::FilterPlanNode filter_plan(people_schema_, values_plan, predicate);
   executors::FilterExecutor filter(ctx_.get(), &filter_plan,
                                    std::move(values_exec));
 

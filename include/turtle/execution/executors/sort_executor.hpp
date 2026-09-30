@@ -19,7 +19,7 @@ struct SortEntry {
 
 class SortComparator {
 public:
-  explicit SortComparator(std::vector<plans::OrderBy> order_bys)
+  explicit SortComparator(std::vector<binder::OrderBy> order_bys)
       : order_bys_(order_bys) {}
 
   bool operator()(const SortEntry &entry_a, const SortEntry &entry_b) {
@@ -41,14 +41,14 @@ public:
 
         // Determine if NULLS should come FIRST
         bool nulls_first = false;
-        if (null_type == plans::OrderByNullType::NULLS_FIRST) {
+        if (null_type == binder::OrderByNullType::NULLS_FIRST) {
           nulls_first = true;
-        } else if (null_type == plans::OrderByNullType::NULLS_LAST) {
+        } else if (null_type == binder::OrderByNullType::NULLS_LAST) {
           nulls_first = false;
         } else {
           // Default SQL behavior:
           // ASC -> NULLS LAST, DESC -> NULL FIRST
-          nulls_first = (order_type == plans::OrderByType::DESC);
+          nulls_first = (order_type == binder::OrderByType::DESC);
         }
 
         if (a_is_null) {
@@ -62,8 +62,8 @@ public:
         continue;
       }
 
-      const bool is_asc = (order_type == plans::OrderByType::ASC ||
-                           order_type == plans::OrderByType::DEFAULT);
+      const bool is_asc = (order_type == binder::OrderByType::ASC ||
+                           order_type == binder::OrderByType::DEFAULT);
 
       if (is_asc) {
         return val_a.compare_less_than(val_b) == datatype::CmpBool::CmpTrue;
@@ -76,7 +76,7 @@ public:
   };
 
 private:
-  std::vector<plans::OrderBy> order_bys_;
+  std::vector<binder::OrderBy> order_bys_;
 };
 
 /**

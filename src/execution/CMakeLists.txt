@@ -27,4 +27,5 @@ target_link_libraries(${EXECUTION_LIBRARY_NAME} PRIVATE
   storage
   catalog
   buffer
+  binder
 )

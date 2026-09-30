@@ -1,36 +1,13 @@
 #pragma once
 
+#include "turtle/binder/bound_order_by.hpp"
 #include "turtle/catalog/column_schema.hpp"
 #include "turtle/common/macros.hpp"
 #include "turtle/execution/expressions/abstract_expression.hpp"
 #include "turtle/execution/plans/abstract_plan.hpp"
-#include <cstdint>
-#include <tuple>
 #include <vector>
 
 namespace turtle::execution::plans {
-
-/**
- * @brief All types of order-bys.
- */
-enum class OrderByType : uint8_t {
-  INVALID = 0, // Invalid order by type
-  DEFAULT = 1, // Default order by type
-  ASC = 2,     // Ascending order by type
-  DESC = 3,    // Descending order by type
-};
-
-/**
- * @brief All types order by nulls.
- */
-enum class OrderByNullType : uint8_t {
-  DEFAULT = 0,     // Default order by type
-  NULLS_FIRST = 1, // Ascending order by type
-  NULLS_LAST = 2,  // Descending order by type
-};
-
-using OrderBy = std::tuple<OrderByType, OrderByNullType,
-                           expressions::AbstractExpressionRef>;
 
 /**
  * The SortPlanNode represents a sort operation. It wioll sort the input with
@@ -44,8 +21,8 @@ public:
    * @param child The child plan node
    * @param order_bys The sort expressions and ther order by types.
    */
-  SortPlanNode(catalog::ColumnSchemaRef output, std::vector<OrderBy> order_bys,
-               AbstractPlanNodeRef child)
+  SortPlanNode(catalog::ColumnSchemaRef output, AbstractPlanNodeRef child,
+               std::vector<binder::OrderBy> order_bys)
       : AbstractPlanNode(std::move(output), {std::move(child)}),
         order_bys_(order_bys) {}
 
@@ -60,7 +37,7 @@ public:
   }
 
   /** @return Get sort by expressions */
-  auto get_order_bys() const -> const std::vector<OrderBy> & {
+  auto get_order_bys() const -> const std::vector<binder::OrderBy> & {
     return this->order_bys_;
   }
 
@@ -76,14 +53,14 @@ protected:
       }
 
       // Format Direction (ASC / DESC)
-      const auto &order_type = std::get<OrderByType>(order_bys_[i]);
+      const auto &order_type = std::get<binder::OrderByType>(order_bys_[i]);
       std::string order_str;
       switch (order_type) {
-      case OrderByType::ASC:
-      case OrderByType::DEFAULT:
+      case binder::OrderByType::ASC:
+      case binder::OrderByType::DEFAULT:
         order_str = "ASC";
         break;
-      case OrderByType::DESC:
+      case binder::OrderByType::DESC:
         order_str = "DESC";
         break;
       default:
@@ -103,7 +80,7 @@ protected:
   }
 
 private:
-  std::vector<OrderBy> order_bys_;
+  std::vector<binder::OrderBy> order_bys_;
 };
 
 } // namespace turtle::execution::plans

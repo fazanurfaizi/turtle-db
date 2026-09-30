@@ -16,18 +16,14 @@ namespace turtle::execution::plans {
  */
 class FilterPlanNode : public AbstractPlanNode {
 public:
-  /** The predicate that all returned tuples must satisfy */
-  expressions::AbstractExpressionRef predicate_;
-
   /**
    * Construct a new FilterPlanNode instance.
    * @param output The output schema of this filter plan node
    * @param predicate The predicate applied during the scan operation
    * @param child The child plan node
    */
-  FilterPlanNode(catalog::ColumnSchemaRef output,
-                 expressions::AbstractExpressionRef predicate,
-                 AbstractPlanNodeRef child)
+  FilterPlanNode(catalog::ColumnSchemaRef output, AbstractPlanNodeRef child,
+                 expressions::AbstractExpressionRef predicate)
       : AbstractPlanNode(std::move(output), {std::move(child)}),
         predicate_{std::move(predicate)} {}
 
@@ -53,6 +49,10 @@ protected:
   auto plan_node_to_string() const -> std::string override {
     return fmt::format("Filter {{ predicate={} }}", this->predicate_);
   }
+
+private:
+  /** The predicate that all returned tuples must satisfy */
+  expressions::AbstractExpressionRef predicate_;
 };
 
 } // namespace turtle::execution::plans

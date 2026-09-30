@@ -18,8 +18,6 @@ namespace turtle::execution::plans {
  */
 class ProjectionPlanNode : public AbstractPlanNode {
 public:
-  std::vector<expressions::AbstractExpressionRef> expressions_;
-
   /**
    * Construct a new ProjectionPlanNode instance.
    * @param output The output schema of this projection node
@@ -27,9 +25,8 @@ public:
    * @param child The child plan node
    */
   ProjectionPlanNode(
-      catalog::ColumnSchemaRef output,
-      std::vector<expressions::AbstractExpressionRef> expressions,
-      AbstractPlanNodeRef child)
+      catalog::ColumnSchemaRef output, AbstractPlanNodeRef child,
+      std::vector<expressions::AbstractExpressionRef> expressions)
       : AbstractPlanNode(std::move(output), {std::move(child)}),
         expressions_(std::move(expressions)) {}
 
@@ -70,6 +67,9 @@ protected:
     }
     return fmt::format("Projection {{ exprs=[{}] }}", exprs);
   }
+
+private:
+  std::vector<expressions::AbstractExpressionRef> expressions_;
 };
 
 } // namespace turtle::execution::plans

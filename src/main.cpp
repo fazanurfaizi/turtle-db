@@ -238,8 +238,8 @@ void run_query(execution::ExecutorContext *ctx,
 
   // Filter: keep rows matching the predicate (schema is unchanged).
   plans::FilterPlanNode filter_plan(
-      schema, build_predicate(cols),
-      std::make_shared<plans::SeqScanPlanNode>(scan_plan));
+      schema, std::make_shared<plans::SeqScanPlanNode>(scan_plan),
+      build_predicate(cols));
   auto filter_exec = std::make_unique<executors::FilterExecutor>(
       ctx, &filter_plan, std::move(scan_exec));
 
@@ -271,8 +271,8 @@ void run_query(execution::ExecutorContext *ctx,
       execution::expressions::ArithmeticType::Addition));
 
   plans::ProjectionPlanNode projection_plan(
-      out_schema, projections,
-      std::make_shared<plans::FilterPlanNode>(filter_plan));
+      out_schema, std::make_shared<plans::FilterPlanNode>(filter_plan),
+      projections);
   executors::ProjectionExecutor projection_exec(ctx, &projection_plan,
                                                 std::move(filter_exec));
 
@@ -295,8 +295,8 @@ void run_sort(execution::ExecutorContext *ctx,
 
   // Filter
   plans::FilterPlanNode filter_plan(
-      schema, build_predicate(cols),
-      std::make_shared<plans::SeqScanPlanNode>(scan_plan));
+      schema, std::make_shared<plans::SeqScanPlanNode>(scan_plan),
+      build_predicate(cols));
   auto filter_exec = std::make_unique<executors::FilterExecutor>(
       ctx, &filter_plan, std::move(scan_exec));
 
@@ -325,22 +325,22 @@ void run_sort(execution::ExecutorContext *ctx,
       execution::expressions::ArithmeticType::Addition));
 
   plans::ProjectionPlanNode projection_plan(
-      out_schema, projections,
-      std::make_shared<plans::FilterPlanNode>(filter_plan));
+      out_schema, std::make_shared<plans::FilterPlanNode>(filter_plan),
+      projections);
   auto projection_exec = std::make_unique<executors::ProjectionExecutor>(
       ctx, &projection_plan, std::move(filter_exec));
 
   // Sort (Order by weight_height DESC [col 7], then name ASC [col 1])
-  std::vector<plans::OrderBy> order_bys = {
-      {plans::OrderByType::DESC, plans::OrderByNullType::NULLS_LAST,
+  std::vector<binder::OrderBy> order_bys = {
+      {binder::OrderByType::DESC, binder::OrderByNullType::NULLS_LAST,
        std::make_shared<expr::ColumnValueExpression>(0, 7, out_cols[7])},
-      {plans::OrderByType::ASC, plans::OrderByNullType::NULLS_FIRST,
+      {binder::OrderByType::ASC, binder::OrderByNullType::NULLS_FIRST,
        std::make_shared<expr::ColumnValueExpression>(0, 1, out_cols[1])},
   };
 
   plans::SortPlanNode sort_plan(
-      out_schema, order_bys,
-      std::make_shared<plans::ProjectionPlanNode>(projection_plan));
+      out_schema, std::make_shared<plans::ProjectionPlanNode>(projection_plan),
+      order_bys);
   auto sort_exec = std::make_unique<executors::SortExecutor>(
       ctx, &sort_plan, std::move(projection_exec));
 
@@ -381,7 +381,7 @@ void run_delete(execution::ExecutorContext *ctx,
       expr::ComparisonType::NotEqual);
 
   plans::FilterPlanNode filter_plan(
-      schema, odd_age, std::make_shared<plans::SeqScanPlanNode>(scan_plan));
+      schema, std::make_shared<plans::SeqScanPlanNode>(scan_plan), odd_age);
   auto filter_exec = std::make_unique<executors::FilterExecutor>(
       ctx, &filter_plan, std::move(scan_exec));
 
