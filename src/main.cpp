@@ -28,6 +28,7 @@
 #include "turtle/execution/executors/insert_executor.hpp"
 #include "turtle/execution/executors/projection_executor.hpp"
 #include "turtle/execution/executors/seq_scan_executor.hpp"
+#include "turtle/execution/executors/sort_executor.hpp"
 #include "turtle/execution/executors/update_executor.hpp"
 #include "turtle/execution/executors/values_executor.hpp"
 #include "turtle/execution/expressions/arithmetic_expression.hpp"
@@ -41,6 +42,7 @@
 #include "turtle/execution/plans/insert_plan.hpp"
 #include "turtle/execution/plans/projection_plan.hpp"
 #include "turtle/execution/plans/seq_scan_plan.hpp"
+#include "turtle/execution/plans/sort_plan.hpp"
 #include "turtle/execution/plans/update_plan.hpp"
 #include "turtle/execution/plans/values_plan.hpp"
 #include "turtle/storage/disk/disk_manager.hpp"
@@ -280,6 +282,74 @@ void run_query(execution::ExecutorContext *ctx,
   print_rows(projection_exec);
 }
 
+// Build and run SeqScan -> Filter -> Projection -> Sort over `people`
+void run_sort(execution::ExecutorContext *ctx,
+              const catalog::ColumnSchemaRef &schema,
+              const std::vector<catalog::Column> &cols, TableOid table_oid) {
+  // 1. SeqScan
+  plans::SeqScanPlanNode scan_plan(schema, table_oid, "people");
+  auto scan_exec =
+      std::make_unique<executors::SeqScanExecutor>(ctx, &scan_plan);
+
+  // 2. Filter
+  plans::FilterPlanNode filter_plan(
+      schema, build_predicate(cols),
+      std::make_shared<plans::SeqScanPlanNode>(scan_plan));
+  auto filter_exec = std::make_unique<executors::FilterExecutor>(
+      ctx, &filter_plan, std::move(scan_exec));
+
+  // 3. Projection
+  auto out_cols = make_projection_columns();
+  auto out_schema = std::make_shared<const catalog::ColumnSchema>(out_cols);
+
+  std::vector<AbstractExpressionRef> projections;
+  projections.push_back(
+      std::make_shared<expr::ColumnValueExpression>(0, 0, out_cols[0]));
+  projections.push_back(
+      std::make_shared<expr::ColumnValueExpression>(0, 1, out_cols[1]));
+  projections.push_back(
+      std::make_shared<expr::ColumnValueExpression>(0, 3, out_cols[2]));
+  projections.push_back(
+      std::make_shared<expr::ColumnValueExpression>(0, 4, out_cols[3]));
+  projections.push_back(
+      std::make_shared<expr::ColumnValueExpression>(0, 6, out_cols[4]));
+  projections.push_back(
+      std::make_shared<expr::ColumnValueExpression>(0, 7, out_cols[5]));
+  projections.push_back(
+      std::make_shared<expr::ColumnValueExpression>(0, 8, out_cols[6]));
+  projections.push_back(std::make_shared<expr::ArithmeticExpression>(
+      std::make_shared<expr::ColumnValueExpression>(0, 3, cols[3]),
+      std::make_shared<expr::ColumnValueExpression>(0, 4, cols[4]),
+      execution::expressions::ArithmeticType::Addition));
+
+  plans::ProjectionPlanNode projection_plan(
+      out_schema, projections,
+      std::make_shared<plans::FilterPlanNode>(filter_plan));
+  auto projection_exec = std::make_unique<executors::ProjectionExecutor>(
+      ctx, &projection_plan, std::move(filter_exec));
+
+  // 4. Sort (Order by weight_height DESC [col 7], then name ASC [col 1])
+  std::vector<plans::OrderBy> order_bys = {
+      {plans::OrderByType::DESC, plans::OrderByNullType::NULLS_LAST,
+       std::make_shared<expr::ColumnValueExpression>(0, 7, out_cols[7])},
+      {plans::OrderByType::ASC, plans::OrderByNullType::NULLS_FIRST,
+       std::make_shared<expr::ColumnValueExpression>(0, 1, out_cols[1])},
+  };
+
+  plans::SortPlanNode sort_plan(
+      out_schema, order_bys,
+      std::make_shared<plans::ProjectionPlanNode>(projection_plan));
+  executors::SortExecutor sort_exec(ctx, &sort_plan,
+                                    std::move(projection_exec));
+
+  std::cout << "--- Sorted Query Output over table='" << scan_plan.table_name_
+            << "' ---\n";
+  print_schema_header(out_cols);
+
+  sort_exec.init();
+  print_rows(sort_exec);
+}
+
 // Build and run SeqScan -> Filter(odd age) -> Delete over `people`, removing
 // every row whose `age` column is odd and reporting the deleted count.
 void run_delete(execution::ExecutorContext *ctx,
@@ -464,6 +534,9 @@ int main() {
   run_insert(&ctx, schema, build_value_rows(k_row_count), table_info->oid_);
   std::cout << "-----AFTER INSERT-----";
   run_query(&ctx, schema, cols, table_info->oid_);
+
+  std::cout << "-----SORTED DATA-----\n";
+  run_sort(&ctx, schema, cols, table_info->oid_);
 
   run_delete(&ctx, schema, cols, table_info->oid_);
   std::cout << "-----AFTER DELETE-----";

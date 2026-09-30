@@ -5,7 +5,6 @@
 #include "turtle/common/macros.hpp"
 #include "turtle/execution/expressions/abstract_expression.hpp"
 #include "turtle/execution/plans/abstract_plan.hpp"
-#include <memory>
 #include <string>
 #include <utility>
 
