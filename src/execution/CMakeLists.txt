@@ -12,6 +12,7 @@ target_sources(${EXECUTION_LIBRARY_NAME} PRIVATE
   executors/filter_executor.cpp
   executors/delete_executor.cpp
   executors/sort_executor.cpp
+  executors/limit_executor.cpp
   aggregation/aggregation_function_registry.cpp
   aggregation/functions/basic_functions.cpp
   aggregation/functions/moment_functions.cpp

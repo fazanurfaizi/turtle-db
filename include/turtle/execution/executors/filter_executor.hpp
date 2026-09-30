@@ -8,6 +8,7 @@
 #include "turtle/storage/table/tuple.hpp"
 #include <memory>
 #include <vector>
+
 namespace turtle::execution::executors {
 
 /**

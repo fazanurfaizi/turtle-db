@@ -26,6 +26,7 @@
 #include "turtle/execution/executors/delete_executor.hpp"
 #include "turtle/execution/executors/filter_executor.hpp"
 #include "turtle/execution/executors/insert_executor.hpp"
+#include "turtle/execution/executors/limit_executor.hpp"
 #include "turtle/execution/executors/projection_executor.hpp"
 #include "turtle/execution/executors/seq_scan_executor.hpp"
 #include "turtle/execution/executors/sort_executor.hpp"
@@ -40,6 +41,7 @@
 #include "turtle/execution/plans/delete_plan.hpp"
 #include "turtle/execution/plans/filter_plan.hpp"
 #include "turtle/execution/plans/insert_plan.hpp"
+#include "turtle/execution/plans/limit_plan.hpp"
 #include "turtle/execution/plans/projection_plan.hpp"
 #include "turtle/execution/plans/seq_scan_plan.hpp"
 #include "turtle/execution/plans/sort_plan.hpp"
@@ -286,19 +288,19 @@ void run_query(execution::ExecutorContext *ctx,
 void run_sort(execution::ExecutorContext *ctx,
               const catalog::ColumnSchemaRef &schema,
               const std::vector<catalog::Column> &cols, TableOid table_oid) {
-  // 1. SeqScan
+  // SeqScan
   plans::SeqScanPlanNode scan_plan(schema, table_oid, "people");
   auto scan_exec =
       std::make_unique<executors::SeqScanExecutor>(ctx, &scan_plan);
 
-  // 2. Filter
+  // Filter
   plans::FilterPlanNode filter_plan(
       schema, build_predicate(cols),
       std::make_shared<plans::SeqScanPlanNode>(scan_plan));
   auto filter_exec = std::make_unique<executors::FilterExecutor>(
       ctx, &filter_plan, std::move(scan_exec));
 
-  // 3. Projection
+  // Projection
   auto out_cols = make_projection_columns();
   auto out_schema = std::make_shared<const catalog::ColumnSchema>(out_cols);
 
@@ -328,7 +330,7 @@ void run_sort(execution::ExecutorContext *ctx,
   auto projection_exec = std::make_unique<executors::ProjectionExecutor>(
       ctx, &projection_plan, std::move(filter_exec));
 
-  // 4. Sort (Order by weight_height DESC [col 7], then name ASC [col 1])
+  // Sort (Order by weight_height DESC [col 7], then name ASC [col 1])
   std::vector<plans::OrderBy> order_bys = {
       {plans::OrderByType::DESC, plans::OrderByNullType::NULLS_LAST,
        std::make_shared<expr::ColumnValueExpression>(0, 7, out_cols[7])},
@@ -339,15 +341,21 @@ void run_sort(execution::ExecutorContext *ctx,
   plans::SortPlanNode sort_plan(
       out_schema, order_bys,
       std::make_shared<plans::ProjectionPlanNode>(projection_plan));
-  executors::SortExecutor sort_exec(ctx, &sort_plan,
-                                    std::move(projection_exec));
+  auto sort_exec = std::make_unique<executors::SortExecutor>(
+      ctx, &sort_plan, std::move(projection_exec));
+
+  // Limit
+  plans::LimitPlanNode limit_plan(
+      out_schema, std::make_shared<plans::SortPlanNode>(sort_plan), 20);
+  executors::LimitExecutor limit_exec =
+      executors::LimitExecutor(ctx, &limit_plan, std::move(sort_exec));
 
   std::cout << "--- Sorted Query Output over table='" << scan_plan.table_name_
             << "' ---\n";
   print_schema_header(out_cols);
 
-  sort_exec.init();
-  print_rows(sort_exec);
+  limit_exec.init();
+  print_rows(limit_exec);
 }
 
 // Build and run SeqScan -> Filter(odd age) -> Delete over `people`, removing
@@ -535,7 +543,7 @@ int main() {
   std::cout << "-----AFTER INSERT-----";
   run_query(&ctx, schema, cols, table_info->oid_);
 
-  std::cout << "-----SORTED DATA-----\n";
+  std::cout << "-----SORTED AND LIMIT DATA-----\n";
   run_sort(&ctx, schema, cols, table_info->oid_);
 
   run_delete(&ctx, schema, cols, table_info->oid_);
